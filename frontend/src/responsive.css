@@ -1,0 +1,13 @@
+@media (max-width: 650px) {
+  .menu-toggle { display: block; color: var(--purple); font-size: 12px; margin-bottom: 12px; }
+  .sidebar:not(.open) .role-switch,
+  .sidebar:not(.open) .side-link { display: none; }
+  .workspace-content { min-width: 0; }
+  .profile-form { display: block; }
+  .profile-form label { display: block; margin: 15px 0; }
+  .toolbar { display: block; }
+  .toolbar .button { margin-top: 12px; }
+  .offer-row, .candidate-row, .table-row { align-items: flex-start; flex-wrap: wrap; }
+  .candidate-row .text-button { margin-left: 50px; }
+  .form-grid { grid-template-columns: 1fr; }
+}

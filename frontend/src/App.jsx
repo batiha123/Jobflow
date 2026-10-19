@@ -1,34 +1,81 @@
-import { useState } from 'react';
-import './App.css';
-import AuthModal from './components/AuthModal';
-import Header from './components/Header';
-import Hero from './components/Hero';
-import Stats from './components/Stats';
+import { useEffect, useMemo, useState } from 'react'
+import './App.css'
+import './responsive.css'
+import { getLocalData, mockDataNotice, saveLocalData } from './data/localAdapter.js'
+import { Button, Feedback, PageHeader, Status } from './components/ui.jsx'
+import { JobCard, Logo, StatCard } from './components/shared.jsx'
+import { WorkspaceLayout } from './components/layouts.jsx'
 
-function App() {
-  const [modal, setModal] = useState(null);
-
-  return (
-    <>
-      <div className={`page ${modal ? 'page-blurred' : ''}`} id="top">
-        <Header onOpenModal={setModal} />
-        <main>
-          <Hero />
-          <Stats />
-          <section className="bottom-banner">
-            <span>ILS RECRUTENT LEURS FUTURS TALENTS SUR JOBFLOW</span>
-          </section>
-        </main>
-      </div>
-      {modal && (
-        <AuthModal
-          mode={modal}
-          onClose={() => setModal(null)}
-          onSwitch={setModal}
-        />
-      )}
-    </>
-  );
+function Header({ onNavigate, onAuth, lang, setLang }) {
+  return <header className="header"><Logo /><nav className="top-nav"><button onClick={() => onNavigate('home')}>Accueil</button><button onClick={() => onNavigate('jobs')}>Offres</button><button onClick={() => onNavigate('company')}>Entreprises</button></nav><div className="header-actions"><button className="language" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}>◎ {lang.toUpperCase()}</button><Button variant="link" onClick={() => onAuth('login')}>{lang === 'fr' ? 'Se connecter' : 'Sign in'}</Button><Button onClick={() => onAuth('register')}>{lang === 'fr' ? 'Créer un compte' : 'Create account'}</Button></div></header>
 }
 
-export default App;
+function Home({ jobs, onNavigate, onSelect, onAuth, lang }) {
+  const en = lang === 'en'
+  return <main><section className="hero"><div className="hero-copy"><div className="eyebrow">{en ? 'JOB SEARCH, REINVENTED' : 'LA RECHERCHE D’EMPLOI, RÉINVENTÉE'}</div><h1>{en ? 'The job that fits you is here.' : 'Le job qui vous ressemble est ici.'}</h1><p>{en ? 'Find an opportunity that truly matches your talents, ambitions, and future.' : 'Trouvez une opportunité qui correspond vraiment à vos talents, vos envies et votre avenir.'}</p><div className="search-panel"><div className="search-field"><span>⌕</span><input placeholder={en ? 'What are you looking for?' : 'Que recherchez-vous ?'} /></div><div className="search-field"><span>⌖</span><input placeholder={en ? 'Where?' : 'Où ?'} /></div><Button onClick={() => onNavigate('jobs')}>{en ? 'Search' : 'Rechercher'} →</Button></div><div className="hero-note">● ● ● &nbsp; {en ? 'Join more than' : 'Rejoignez plus de'} <b>12 400</b> {en ? 'talents' : 'talents déjà inscrits'}</div></div><div className="hero-art"><div className="art-card art-main"><span className="art-label">MATCH PARFAIT</span><div className="match-circle">92<small>%</small></div><strong>Votre profil correspond</strong><span>à une nouvelle opportunité</span></div><div className="art-card art-float">✦ <b>+ 24 nouvelles offres</b><small>cette semaine</small></div><div className="art-shape" /></div></section><section className="stats"><div><b>{jobs.length * 3100}<span>+</span></b><small>offres à découvrir</small></div><div><b>850</b><small>entreprises ambitieuses</small></div><div><b>92<span>%</span></b><small>de talents satisfaits</small></div><div className="stats-cta">Votre futur vous attend. <button onClick={() => onNavigate('dashboard')}>Découvrir mon espace →</button></div></section><section className="section"><div className="section-heading"><div><div className="eyebrow">OPPORTUNITÉS À SAISIR</div><h2>{en ? 'Featured opportunities' : 'Les offres du moment'}</h2><p>{en ? 'Opportunities selected for you.' : 'Des opportunités sélectionnées pour vous.'}</p></div><button className="outline-button" onClick={() => onNavigate('jobs')}>Voir toutes les offres →</button></div><div className="job-grid">{jobs.slice(0, 3).map(job => <JobCard key={job.id} job={job} onSelect={onSelect} />)}</div></section><section className="benefit-section"><div><div className="eyebrow">UNE EXPÉRIENCE PENSÉE POUR VOUS</div><h2>Pourquoi JobFlow ?</h2><p>Tout ce qu’il vous faut pour faire avancer votre carrière.</p></div><div className="benefit-grid">{[['✦', 'Un matching intelligent'], ['◈', 'Des entreprises inspirantes'], ['✓', 'Un accompagnement humain']].map(([icon, title]) => <div className="benefit" key={title}><span>{icon}</span><h3>{title}</h3><p>Avancez sereinement avec des outils pensés pour vos objectifs.</p></div>)}</div></section><section className="cta-section"><div><h2>Votre prochaine aventure<br /><em>commence ici.</em></h2><p>Un nouvel avenir professionnel vous attend.</p></div><div className="cta-buttons"><Button onClick={() => onAuth('register')}>Je suis candidat →</Button><Button variant="light" onClick={() => onNavigate('company')}>Je recrute →</Button></div></section></main>
+}
+
+function JobsPage({ jobs, onSelect }) {
+  const [filters, setFilters] = useState({ query: '', type: 'Tous les contrats', level: 'Tous les niveaux' })
+  const filtered = jobs.filter(job => `${job.title} ${job.company} ${job.tags.join(' ')}`.toLowerCase().includes(filters.query.toLowerCase()) && (filters.type === 'Tous les contrats' || job.type === filters.type) && (filters.level === 'Tous les niveaux' || job.level === filters.level))
+  return <main className="page-content"><div className="page-intro"><div className="eyebrow">OPPORTUNITÉS</div><h1>Trouvez votre prochaine opportunité.</h1><p>{filtered.length} offres correspondent à votre recherche.</p></div><div className="listing-layout"><aside className="filters"><h3>Filtrer les offres</h3><label>Recherche<input value={filters.query} onChange={e => setFilters({ ...filters, query: e.target.value })} placeholder="Métier, compétence..." /></label><label>Type de contrat<select value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}><option>Tous les contrats</option><option>CDI</option><option>CDD</option></select></label><label>Expérience<select value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option>Tous les niveaux</option><option>Junior</option><option>Confirmé</option><option>Senior</option></select></label><button className="clear-filter" onClick={() => setFilters({ query: '', type: 'Tous les contrats', level: 'Tous les niveaux' })}>Réinitialiser les filtres</button></aside><div className="results">{filtered.map(job => <JobCard key={job.id} job={job} onSelect={onSelect} />)}{!filtered.length && <div className="empty"><span>⌕</span><h3>Aucune offre trouvée</h3><p>Essayez de modifier vos critères de recherche.</p></div>}</div></div></main>
+}
+
+function JobDetail({ job, onBack, onApply, applied }) {
+  return <main className="page-content"><button className="back-button" onClick={onBack}>← Retour aux offres</button><div className="detail-layout"><article className="detail-main"><div className="detail-company"><div className="company-logo large" style={{ background: job.color }}>{job.logo}</div><div><h1>{job.title}</h1><p>{job.company} · {job.location}</p></div></div><div className="detail-tags">{job.tags.map(tag => <span key={tag}>{tag}</span>)}</div><h2>À propos du poste</h2><p>Nous recherchons un profil passionné pour rejoindre une équipe ambitieuse et construire les produits de demain.</p><h2>Vos missions</h2><ul><li>Collaborer avec les équipes produit, design et engineering.</li><li>Participer aux décisions et améliorer l’expérience utilisateur.</li></ul><h2>Profil recherché</h2><p>Vous êtes curieux, autonome et aimez apprendre. Une première expérience est appréciée.</p></article><aside className="apply-card"><div className="salary">{job.salary}<small>par an</small></div><div className="side-detail">⌖ {job.location}</div><div className="side-detail">◷ {job.type}</div><div className="side-detail">◉ {job.level}</div><Button variant={applied ? 'success' : 'primary'} onClick={onApply}>{applied ? 'Candidature envoyée ✓' : 'Postuler à cette offre →'}</Button><small>Démo locale : aucune candidature n’est envoyée à un serveur.</small></aside></div></main>
+}
+
+function AuthModal({ onClose, onSuccess }) {
+  const [register, setRegister] = useState(false)
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={event => event.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><Logo /><h2>{register ? 'Créer votre compte' : 'Ravi de vous revoir'}</h2><p>Cette authentification est uniquement une démonstration locale.</p><label>Email<input type="email" required placeholder="vous@exemple.com" /></label><label>Mot de passe<input type="password" required placeholder="••••••••" /></label><Button onClick={onSuccess}>{register ? 'Créer mon compte' : 'Se connecter'} →</Button><button className="modal-switch" onClick={() => setRegister(!register)}>{register ? 'Déjà un compte ? Se connecter' : 'Pas encore de compte ? Créer un compte'}</button></div></div>
+}
+
+function DashboardPage({ data, setData, page, onNavigate }) {
+  const updateProfile = event => { event.preventDefault(); const form = new FormData(event.currentTarget); setData(saveLocalData({ ...data, profile: Object.fromEntries(form) })); event.currentTarget.reset(); }
+  if (page === 'profile') return <DashboardShell title="Mon profil" subtitle="Présentez le meilleur de votre parcours."><form className="dashboard-card profile-form" onSubmit={updateProfile}><h3>Informations professionnelles</h3>{[['firstName', 'Prénom'], ['lastName', 'Nom'], ['email', 'Email'], ['headline', 'Titre professionnel'], ['skills', 'Compétences'], ['languages', 'Langues']].map(([name, label]) => <label key={name}>{label}<input name={name} defaultValue={data.profile[name]} required /></label>)}<label>À propos<textarea name="summary" defaultValue={data.profile.summary} rows="4" required /></label><Button type="submit">Enregistrer les modifications</Button><Feedback>{mockDataNotice}</Feedback></form></DashboardShell>
+  if (page === 'cv') return <DashboardShell title="Mon CV & analyse IA" subtitle="Gérez vos documents localement et préparez votre profil."><div className="cv-panel"><label className="upload-zone">▣<b>Sélectionner un CV</b><small>PDF ou DOCX · aperçu local uniquement</small><input type="file" accept=".pdf,.doc,.docx" /></label><div className="analysis"><div className="analysis-score">86<small>/100</small></div><div><b>Analyse de démonstration</b><p>Les résultats IA réels seront fournis par le futur backend.</p></div></div></div></DashboardShell>
+  if (page === 'applications') return <DashboardShell title="Mes candidatures" subtitle="Suivez vos démarches au même endroit."><div className="dashboard-card">{data.applications.map(app => <div className="application-row" key={app.id}><div className="mini-logo">{app.company.slice(0, 2)}</div><div><b>{app.job}</b><span>{app.company} · {app.date}</span></div><Status status={app.status} /><button className="text-button" onClick={() => onNavigate('jobs')}>Voir l’offre</button></div>)}</div></DashboardShell>
+  if (page === 'offers') return <CompanyOffers data={data} setData={setData} />
+  if (page === 'candidates') return <CandidateManagement data={data} setData={setData} />
+  if (page === 'users' || page === 'moderation') return <AdminManagement data={data} page={page} />
+  return <DashboardShell title="Bonjour, Marie 👋" subtitle="Voici un aperçu de votre recherche d’emploi."><div className="stat-grid"><StatCard label="Candidatures envoyées" value={data.applications.length} change="2 ce mois" /><StatCard label="Entretiens à venir" value="3" change="Cette semaine" color="orange" /><StatCard label="Profil complété" value="86%" color="green" /></div><div className="dashboard-grid"><div className="dashboard-card"><div className="card-title"><h3>Mes candidatures récentes</h3><button onClick={() => onNavigate('applications')}>Tout voir →</button></div>{data.applications.slice(0, 3).map(app => <div className="application-row" key={app.id}><div className="mini-logo">{app.company.slice(0, 2)}</div><div><b>{app.job}</b><span>{app.company}</span></div><Status status={app.status} /></div>)}</div><div className="dashboard-card ai-card"><span className="ai-spark">✦</span><h3>Votre profil est à 86%</h3><p>Ajoutez vos langues pour augmenter vos chances de matching.</p><button onClick={() => onNavigate('profile')}>Compléter mon profil →</button></div></div></DashboardShell>
+}
+
+function DashboardShell({ title, subtitle, children }) { return <div className="dashboard-main"><PageHeader title={title}><div className="user-chip"><span>MD</span> Marie Dubois ▾</div></PageHeader><p className="dashboard-subtitle">{subtitle}</p>{children}</div> }
+
+function CompanyOffers({ data, setData }) {
+  const [editing, setEditing] = useState(null)
+  const [query, setQuery] = useState('')
+  const visible = data.jobs.filter(job => job.company === 'Nova Studio' && job.title.toLowerCase().includes(query.toLowerCase()))
+  const submit = event => { event.preventDefault(); const form = new FormData(event.currentTarget); const offer = { ...Object.fromEntries(form), id: editing?.id || Date.now(), company: 'Nova Studio', logo: 'NS', color: '#e4efff', tags: String(form.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean), posted: 'Aujourd’hui', applications: editing?.applications || 0, status: form.get('status') || 'draft' }; const jobs = editing ? data.jobs.map(job => job.id === editing.id ? { ...job, ...offer } : job) : [...data.jobs, offer]; setData(saveLocalData({ ...data, jobs })); setEditing(null) }
+  return <DashboardShell title="Mes offres" subtitle="Créez et gérez vos opportunités de recrutement."><div className="toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une offre..." /><Button onClick={() => setEditing({})}>+ Créer une offre</Button></div>{editing !== null && <form className="dashboard-card offer-form" onSubmit={submit}><h3>{editing.id ? 'Modifier l’offre' : 'Nouvelle offre'}</h3><label>Titre<input name="title" defaultValue={editing.title} required /></label><label>Description<textarea name="description" rows="4" defaultValue={editing.description} required /></label><label>Compétences requises<input name="tags" defaultValue={editing.tags?.join(', ')} placeholder="React, TypeScript" required /></label><div className="form-grid"><label>Type<select name="type" defaultValue={editing.type || 'CDI'}><option>CDI</option><option>CDD</option></select></label><label>Niveau<select name="level" defaultValue={editing.level || 'Junior'}><option>Junior</option><option>Confirmé</option><option>Senior</option></select></label></div><Button type="submit">Enregistrer</Button> <button className="clear-filter" onClick={() => setEditing(null)}>Annuler</button><Feedback>{mockDataNotice}</Feedback></form>}<div className="dashboard-card offer-list">{visible.map(job => <div className="offer-row" key={job.id}><div><b>{job.title}</b><span>{job.location} · {job.applications} candidatures</span></div><Status status={job.status === 'active' ? 'Publié' : 'Brouillon'} /><button className="text-button" onClick={() => setEditing(job)}>Modifier</button></div>)}</div></DashboardShell>
+}
+
+function CandidateManagement({ data, setData }) {
+  const update = (candidate, status) => setData(saveLocalData({ ...data, candidates: data.candidates.map(item => item.id === candidate.id ? { ...item, status } : item) }))
+  return <DashboardShell title="Candidats" subtitle="Évaluez les candidatures de vos offres."><div className="dashboard-card"><div className="card-title"><h3>Frontend React Developer · {data.candidates.length} candidats</h3><span className="demo-label">Données locales</span></div>{data.candidates.map(candidate => <div className="candidate-row" key={candidate.id}><div className="user-avatar">{candidate.name.split(' ').map(part => part[0]).join('')}</div><div><b>{candidate.name}</b><span>{candidate.skills} · Candidature du {candidate.date}</span></div><strong className="match-score">{candidate.match}</strong><select value={candidate.status} onChange={event => update(candidate, event.target.value)}><option>À examiner</option><option>En entretien</option><option>Acceptée</option><option>Refusée</option></select><button className="text-button">Voir le profil</button></div>)}</div></DashboardShell>
+}
+
+function AdminManagement({ data, page }) {
+  const rows = page === 'users' ? [['Marie Dubois', 'Candidat', 'Actif'], ['Nova Studio', 'Entreprise', 'Actif'], ['Lumen Labs', 'Entreprise', 'En attente']] : data.jobs.map(job => [job.title, job.company, job.status === 'active' ? 'Publié' : 'Brouillon'])
+  return <DashboardShell title={page === 'users' ? 'Utilisateurs' : 'Modération'} subtitle="Gérez les données de démonstration de la plateforme."><div className="dashboard-card data-table"><div className="card-title"><h3>{page === 'users' ? 'Utilisateurs inscrits' : 'Offres à contrôler'}</h3><input placeholder="Rechercher..." /></div>{rows.map(row => <div className="table-row" key={row[0]}>{row.map(cell => <span key={cell}>{cell}</span>)}<button className="text-button">Détails</button></div>)}</div></DashboardShell>
+}
+
+export default function App() {
+  const [data, setData] = useState(getLocalData)
+  const [lang, setLang] = useState('fr')
+  const [role, setRole] = useState('candidate')
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || 'home')
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [modal, setModal] = useState(false)
+  const [authenticated, setAuthenticated] = useState(false)
+  useEffect(() => { const onHash = () => setRoute(window.location.hash.slice(1) || 'home'); window.addEventListener('hashchange', onHash); return () => window.removeEventListener('hashchange', onHash) }, [])
+  const navigate = next => { setSelectedJob(null); window.location.hash = next }
+  const appliedIds = useMemo(() => data.applications.map(app => data.jobs.find(job => job.title === app.job)?.id).filter(Boolean), [data])
+  const selectJob = job => { setSelectedJob(job); window.location.hash = 'job' }
+  const apply = () => { if (selectedJob && !appliedIds.includes(selectedJob.id)) setData(saveLocalData({ ...data, applications: [{ id: Date.now(), job: selectedJob.title, company: selectedJob.company, date: 'Aujourd’hui', status: 'Candidature envoyée' }, ...data.applications] })) }
+  const applyWithAuth = () => { if (authenticated) apply(); else setModal(true) }
+  const workspacePages = ['dashboard', 'profile', 'applications', 'cv', 'tests', 'offers', 'candidates', 'statistics', 'users', 'moderation']
+  const workspace = workspacePages.includes(route)
+  return <div className="app">{workspace ? <WorkspaceLayout role={role} page={route} onNavigate={navigate} onRoleChange={setRole}><DashboardPage data={data} setData={setData} page={route} onNavigate={navigate} /></WorkspaceLayout> : <><Header onNavigate={navigate} onAuth={() => setModal(true)} lang={lang} setLang={setLang} />{route === 'home' && <Home jobs={data.jobs} onNavigate={navigate} onSelect={selectJob} onAuth={() => setModal(true)} lang={lang} />}{route === 'jobs' && <JobsPage jobs={data.jobs} onSelect={selectJob} />}{route === 'job' && selectedJob && <JobDetail job={selectedJob} onBack={() => navigate('jobs')} onApply={applyWithAuth} applied={appliedIds.includes(selectedJob.id)} />}{route === 'company' && <main className="company-landing"><div className="eyebrow">POUR LES ENTREPRISES</div><h1>Les talents qui feront<br /><em>grandir votre vision.</em></h1><p>Publiez vos offres, identifiez les bons profils et construisez votre équipe avec JobFlow.</p><Button onClick={() => navigate('offers')}>Accéder à l’espace entreprise →</Button></main>}</>}{modal && <AuthModal onClose={() => setModal(false)} onSuccess={() => { setAuthenticated(true); setModal(false); navigate('dashboard') }} />}</div>
+}
