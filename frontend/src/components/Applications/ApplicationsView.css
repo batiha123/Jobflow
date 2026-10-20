@@ -1,0 +1,167 @@
+/* =========================================================
+   Applications View Styling — JobFlow Theme
+   ========================================================= */
+
+.applications-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.application-card-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.application-card-item:hover {
+  border-color: #d4ceff;
+  box-shadow: var(--shadow-md);
+}
+
+.app-card-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.app-title-group h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.app-company-text {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.app-status-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.status-SUBMITTED { background: #f0f9ff; color: #0284c7; }
+.status-UNDER_REVIEW { background: #fffaeb; color: #b54708; }
+.status-SHORTLISTED { background: #f1effe; color: var(--color-primary); }
+.status-ACCEPTED { background: #ecfdf3; color: #12b76a; }
+.status-REJECTED { background: #fef3f2; color: #b42318; }
+.status-WITHDRAWN { background: #f2f4f7; color: #475467; }
+
+/* Visual Progression Steps */
+.app-progress-tracker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.progress-step-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-alt);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.progress-step-pill.completed {
+  background: #ecfdf3;
+  color: #12b76a;
+}
+
+.progress-step-pill.current {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.app-interview-alert {
+  background-color: #f1effe;
+  border: 1px solid #d4ceff;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.app-interview-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.btn-join-meet {
+  background-color: var(--color-primary);
+  color: var(--text-white);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.btn-join-meet:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.app-card-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  background: var(--bg-surface-alt);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  font-size: 0.86rem;
+}
+
+.detail-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.detail-val {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Recruiter Action Bar */
+.recruiter-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--border-default);
+  padding-top: 14px;
+  flex-wrap: wrap;
+}

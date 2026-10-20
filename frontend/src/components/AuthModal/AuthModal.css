@@ -1,0 +1,98 @@
+/* =========================================================
+   AuthModal Styling — JobFlow Theme
+   ========================================================= */
+
+.auth-modal-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-2xl);
+  max-width: 480px;
+  width: 100%;
+  padding: 36px;
+  box-shadow: 0 25px 60px -12px rgba(16, 24, 40, 0.25);
+  position: relative;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  0% { transform: scale(0.96); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.auth-tab-switch {
+  display: flex;
+  background-color: var(--bg-surface-alt);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.auth-tab-btn.active {
+  background-color: var(--bg-surface);
+  color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08);
+}
+
+/* Account type selector in Register */
+.role-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.role-choice-card {
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.role-choice-card:hover {
+  border-color: var(--color-primary);
+}
+
+.role-choice-card.selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.role-choice-card-icon {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.role-choice-card-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.role-choice-card-desc {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.auth-error-msg {
+  background-color: var(--color-danger-bg);
+  border: 1px solid #fecdca;
+  color: var(--color-danger);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}

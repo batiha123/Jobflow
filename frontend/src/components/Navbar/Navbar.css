@@ -1,0 +1,208 @@
+.navbar-container {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: all var(--transition-normal);
+}
+
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+/* Brand Logo */
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+
+.brand-icon {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.brand-icon-bar {
+  width: 4px;
+  border-radius: 2px;
+  background-color: var(--color-primary);
+}
+
+.brand-icon-bar:nth-child(1) { height: 12px; opacity: 0.6; }
+.brand-icon-bar:nth-child(2) { height: 18px; opacity: 0.85; }
+.brand-icon-bar:nth-child(3) { height: 22px; opacity: 1; }
+
+.brand-dot {
+  color: var(--color-primary);
+}
+
+/* Nav Navigation */
+.navbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+}
+
+.nav-link {
+  font-size: 0.925rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--color-primary);
+}
+
+.nav-badge {
+  font-size: 0.725rem;
+  font-weight: 600;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+/* Right Actions */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lang-picker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.lang-picker:hover {
+  background-color: var(--bg-surface-alt);
+  color: var(--text-primary);
+}
+
+.btn-login {
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 8px 14px;
+  transition: color var(--transition-fast);
+}
+
+.btn-login:hover {
+  color: var(--color-primary);
+}
+
+.btn-register-pill {
+  background-color: var(--color-primary);
+  color: var(--text-white);
+  font-size: 0.925rem;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 14px rgba(92, 76, 252, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.btn-register-pill:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(92, 76, 252, 0.35);
+}
+
+/* Logged In User Pill */
+.user-logged-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 8px;
+  background-color: var(--bg-surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.user-logged-pill:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.user-avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-display-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.user-role-badge {
+  font-size: 0.7rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.btn-logout-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.btn-logout-icon:hover {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+@media (max-width: 900px) {
+  .navbar-nav {
+    display: none;
+  }
+}

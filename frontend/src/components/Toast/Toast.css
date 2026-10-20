@@ -1,0 +1,67 @@
+/* =========================================================
+   Toast Notification Styling — JobFlow Theme
+   ========================================================= */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  box-shadow: 0 12px 32px -4px rgba(16, 24, 40, 0.16);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+  animation: slideToast 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all var(--transition-fast);
+}
+
+@keyframes slideToast {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.toast-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-success .toast-icon-box { background: #ecfdf3; color: #12b76a; }
+.toast-info .toast-icon-box { background: #f1effe; color: var(--color-primary); }
+.toast-warning .toast-icon-box { background: #fffaeb; color: #f79009; }
+.toast-error .toast-icon-box { background: #fef3f2; color: #f04438; }
+
+.toast-msg-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.toast-close-btn {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.toast-close-btn:hover {
+  color: var(--text-primary);
+}

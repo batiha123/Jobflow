@@ -1,0 +1,81 @@
+/* =========================================================
+   Jobs Catalog Page Styling — JobFlow Theme
+   ========================================================= */
+
+.jobs-page-header {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  padding: 48px 0 36px 0;
+}
+
+.jobs-search-bar-row {
+  display: flex;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 10px 16px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.jobs-search-input {
+  flex: 1;
+  min-width: 220px;
+  border: none;
+  outline: none;
+  font-size: 0.95rem;
+  background: transparent;
+}
+
+.jobs-filter-select {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  outline: none;
+}
+
+.jobs-layout-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 32px;
+  padding: 40px 0 80px 0;
+}
+
+.jobs-sidebar-filters {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: fit-content;
+}
+
+.filter-section-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.filter-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .jobs-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,32 @@
+package com.team.backend.controller;
+
+import com.team.backend.dto.JobOfferDTO;
+import com.team.backend.service.JobOfferService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/jobs")
+public class JobOfferController {
+
+    @Autowired
+    private JobOfferService jobOfferService;
+
+    @GetMapping
+    public ResponseEntity<List<JobOfferDTO>> getJobs(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String contractType) {
+        List<JobOfferDTO> jobs = jobOfferService.getPublishedOffers(keyword, location, contractType);
+        return ResponseEntity.ok(jobs);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<JobOfferDTO> getJobById(@PathVariable Long id) {
+        JobOfferDTO job = jobOfferService.getOfferById(id);
+        return ResponseEntity.ok(job);
+    }
+}

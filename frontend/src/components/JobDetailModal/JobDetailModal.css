@@ -1,0 +1,75 @@
+/* =========================================================
+   JobDetailModal Styling — JobFlow Theme
+   ========================================================= */
+
+.job-detail-modal-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-2xl);
+  max-width: 720px;
+  width: 100%;
+  padding: 36px;
+  box-shadow: 0 25px 50px -12px rgba(16, 24, 40, 0.25);
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.job-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: 24px;
+}
+
+.job-detail-logo {
+  width: 68px;
+  height: 68px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  border: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.job-detail-title-group h2 {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.job-detail-company {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-top: 4px;
+}
+
+.job-detail-meta-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.job-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.job-detail-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.job-detail-text {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  white-space: pre-line;
+}
