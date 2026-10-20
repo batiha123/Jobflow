@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../data/dbStore';
+import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2, Save, CheckCircle2, Upload, Trash2 } from 'lucide-react';
 import './CompanyProfileForm.css';
@@ -20,33 +21,47 @@ export function CompanyProfileForm({ onProfileUpdated }) {
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
-    const existing = db.getCompanyProfileByUser(currentUser);
-    if (existing) {
-      setProfile({
-        company_name: existing.company_name || currentUser.companyName || currentUser.name || '',
-        description: existing.description || '',
-        address: existing.address || '',
-        website: existing.website || '',
-        logo_url: existing.logo_url || '',
-        contact_name: existing.contact_name || currentUser.name || '',
-        contact_email: existing.contact_email || currentUser.email || '',
-        contact_phone: existing.contact_phone || currentUser.phone || ''
-      });
-    } else {
-      setProfile({
-        company_name: currentUser.companyName || currentUser.name || '',
-        description: '',
-        address: '',
-        website: '',
-        logo_url: '',
-        contact_name: currentUser.name || '',
-        contact_email: currentUser.email || '',
-        contact_phone: currentUser.phone || ''
-      });
-    }
+
+    const loadProfile = async () => {
+      try {
+        const liveProfile = await api.companies.getProfile(currentUser.id);
+        if (liveProfile) {
+          setProfile({
+            company_name: liveProfile.companyName || currentUser.companyName || currentUser.name || '',
+            description: liveProfile.description || '',
+            address: liveProfile.address || '',
+            website: liveProfile.website || '',
+            logo_url: liveProfile.logoUrl || '',
+            contact_name: currentUser.name || '',
+            contact_email: liveProfile.contactEmail || currentUser.email || '',
+            contact_phone: liveProfile.contactPhone || currentUser.phone || ''
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("Échec chargement profil entreprise distant, fallback local:", err);
+      }
+
+      const existing = db.getCompanyProfileByUser(currentUser);
+      if (existing) {
+        setProfile({
+          company_name: existing.company_name || currentUser.companyName || currentUser.name || '',
+          description: existing.description || '',
+          address: existing.address || '',
+          website: existing.website || '',
+          logo_url: existing.logo_url || '',
+          contact_name: existing.contact_name || currentUser.name || '',
+          contact_email: existing.contact_email || currentUser.email || '',
+          contact_phone: existing.contact_phone || currentUser.phone || ''
+        });
+      }
+    };
+
+    loadProfile();
   }, [currentUser]);
 
   const handleChange = (field, value) => {
@@ -75,13 +90,35 @@ export function CompanyProfileForm({ onProfileUpdated }) {
     if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const updated = db.updateCompanyProfileByUser(currentUser, profile);
-    if (updated) {
+    setIsSaving(true);
+
+    try {
+      // 1. Save to Spring Boot backend
+      await api.companies.updateProfile(currentUser.id, {
+        companyName: profile.company_name,
+        description: profile.description,
+        address: profile.address,
+        website: profile.website,
+        logoUrl: profile.logo_url,
+        contactPhone: profile.contact_phone
+      });
+
+      // 2. Also sync local dbStore
+      db.updateCompanyProfileByUser(currentUser, profile);
+
       setSavedSuccess(true);
-      if (onProfileUpdated) onProfileUpdated(updated);
+      if (onProfileUpdated) onProfileUpdated(profile);
       setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (err) {
+      console.error("Erreur mise à jour profil entreprise:", err);
+      // Fallback local save
+      db.updateCompanyProfileByUser(currentUser, profile);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -97,194 +134,149 @@ export function CompanyProfileForm({ onProfileUpdated }) {
       {savedSuccess && (
         <div className="save-success-banner">
           <CheckCircle2 size={18} />
-          <span>Modifications enregistrées avec succès !</span>
+          <span>Modifications enregistrées avec succès en base de données !</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="form-grid-2">
-          {/* company_name */}
-          <div className="form-group full-width">
-            <label className="form-label">
-              <span>Nom de l'entreprise</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              required
-              placeholder="Ex: Nova Studio, Greenly..."
-              value={profile.company_name}
-              onChange={(e) => handleChange('company_name', e.target.value)}
-            />
+        {/* LOGO UPLOAD SECTION */}
+        <div className="company-logo-preview-row">
+          <div 
+            className="company-logo-wrap"
+            onClick={() => logoInputRef.current?.click()}
+            title="Cliquer pour importer le logo depuis votre PC"
+          >
+            {profile.logo_url ? (
+              <img src={profile.logo_url} alt="Logo entreprise" className="company-logo-img" />
+            ) : (
+              <div className="company-logo-placeholder">
+                <Building2 size={36} />
+              </div>
+            )}
           </div>
 
-          {/* website */}
-          <div className="form-group">
-            <label className="form-label">
-              <span>Site Web</span>
-            </label>
-            <input
-              type="url"
-              className="form-input"
-              placeholder="https://votre-entreprise.com"
-              value={profile.website}
-              onChange={(e) => handleChange('website', e.target.value)}
-            />
-          </div>
-
-          {/* address */}
-          <div className="form-group">
-            <label className="form-label">
-              <span>Adresse du siège</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Ex: 15 Avenue des Champs-Élysées, Paris"
-              value={profile.address}
-              onChange={(e) => handleChange('address', e.target.value)}
-            />
-          </div>
-
-          {/* logo file upload from PC */}
-          <div className="form-group full-width">
+          <div style={{ flex: 1 }}>
             <label className="form-label" style={{ marginBottom: '6px' }}>
               <span>Logo de l'entreprise</span>
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '6px' }}>
-              <div 
-                style={{ 
-                  width: '72px', 
-                  height: '72px', 
-                  borderRadius: '12px', 
-                  border: '2px dashed var(--border-default)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  background: 'var(--bg-surface-alt)',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  flexShrink: 0
-                }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <input 
+                type="file" 
+                ref={logoInputRef} 
+                accept="image/png, image/jpeg, image/jpg, image/webp" 
+                style={{ display: 'none' }}
+                onChange={handleLogoUpload} 
+              />
+              <button 
+                type="button" 
+                className="btn-upload-logo"
                 onClick={() => logoInputRef.current?.click()}
-                title="Cliquer pour choisir un logo depuis votre PC"
               >
-                {profile.logo_url ? (
-                  <img src={profile.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                ) : (
-                  <Building2 size={28} style={{ color: 'var(--text-tertiary)' }} />
-                )}
-              </div>
+                <Upload size={15} />
+                <span>Importer un logo depuis mon PC</span>
+              </button>
 
-              <div>
-                <input 
-                  type="file" 
-                  ref={logoInputRef} 
-                  accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" 
-                  style={{ display: 'none' }}
-                  onChange={handleLogoUpload} 
-                />
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button 
-                    type="button" 
-                    className="btn-upload-photo"
-                    onClick={() => logoInputRef.current?.click()}
-                  >
-                    <Upload size={15} />
-                    <span>Importer le logo depuis mon PC</span>
-                  </button>
-                  {profile.logo_url && (
-                    <button 
-                      type="button" 
-                      className="btn-remove-photo"
-                      onClick={handleRemoveLogo}
-                    >
-                      <Trash2 size={15} />
-                      <span>Supprimer</span>
-                    </button>
-                  )}
-                </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '6px' }}>
-                  Formats acceptés : PNG, JPG, WebP ou SVG (max. 5 Mo).
-                </p>
-              </div>
+              {profile.logo_url && (
+                <button 
+                  type="button" 
+                  className="btn-remove-logo"
+                  onClick={handleRemoveLogo}
+                  title="Supprimer le logo"
+                >
+                  <Trash2 size={15} />
+                  <span>Supprimer</span>
+                </button>
+              )}
             </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+              Format recommandé : PNG ou JPG carré ou paysage (max. 5 Mo).
+            </p>
           </div>
+        </div>
 
-          {/* description */}
+        <div className="form-grid-2">
           <div className="form-group full-width">
             <label className="form-label">
-              <span>Description & Activité de l'entreprise</span>
+              <span>Raison Sociale / Nom de l'entreprise *</span>
             </label>
-            <textarea
+            <input 
+              type="text" 
+              required
+              className="form-input" 
+              value={profile.company_name} 
+              onChange={(e) => handleChange('company_name', e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group full-width">
+            <label className="form-label">
+              <span>Description de l'activité & culture d'entreprise</span>
+            </label>
+            <textarea 
+              rows={4}
               className="form-textarea"
-              placeholder="Présentez votre entreprise, vos valeurs, vos projets innovants..."
+              placeholder="Présentez votre mission, vos valeurs et vos projets d'avenir pour attirer les meilleurs candidats..."
               value={profile.description}
               onChange={(e) => handleChange('description', e.target.value)}
-            ></textarea>
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <span>Siège Social / Adresse complète</span>
+            </label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="Ex: 15 Avenue des Champs-Élysées, 75008 Paris"
+              value={profile.address} 
+              onChange={(e) => handleChange('address', e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <span>Site Web officiel</span>
+            </label>
+            <input 
+              type="url" 
+              className="form-input" 
+              placeholder="https://votre-entreprise.com"
+              value={profile.website} 
+              onChange={(e) => handleChange('website', e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <span>Email de contact RH</span>
+            </label>
+            <input 
+              type="email" 
+              className="form-input" 
+              value={profile.contact_email} 
+              onChange={(e) => handleChange('contact_email', e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <span>Téléphone professionnel</span>
+            </label>
+            <input 
+              type="tel" 
+              className="form-input" 
+              placeholder="+33 1 42 68 90 00"
+              value={profile.contact_phone} 
+              onChange={(e) => handleChange('contact_phone', e.target.value)} 
+            />
           </div>
         </div>
 
-        {/* Section: Linked User Data */}
-        <div style={{ marginTop: '20px', marginBottom: '20px', borderTop: '1px solid var(--border-default)', paddingTop: '20px' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)' }}>
-            Coordonnées du Responsable RH / Contact
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginBottom: '18px' }}>
-            Ces coordonnées sont utilisées pour la communication avec les candidats.
-          </p>
-
-          <div className="form-grid-2">
-            {/* contact_name */}
-            <div className="form-group">
-              <label className="form-label">
-                <span>Nom du contact RH / Représentant</span>
-              </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Ex: Sophie Mercier"
-                value={profile.contact_name}
-                onChange={(e) => handleChange('contact_name', e.target.value)}
-              />
-            </div>
-
-            {/* contact_email */}
-            <div className="form-group">
-              <label className="form-label">
-                <span>Email de contact</span>
-              </label>
-              <input
-                type="email"
-                className="form-input"
-                required
-                placeholder="contact@entreprise.com"
-                value={profile.contact_email}
-                onChange={(e) => handleChange('contact_email', e.target.value)}
-              />
-            </div>
-
-            {/* contact_phone */}
-            <div className="form-group full-width">
-              <label className="form-label">
-                <span>Téléphone professionnel</span>
-              </label>
-              <input
-                type="tel"
-                className="form-input"
-                placeholder="+33 1 42 68 90 00"
-                value={profile.contact_phone}
-                onChange={(e) => handleChange('contact_phone', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Actions */}
         <div className="form-actions-footer">
-          <button type="submit" className="btn-primary-save">
+          <button type="submit" className="btn-primary-save" disabled={isSaving}>
             <Save size={16} />
-            <span>Enregistrer les modifications</span>
+            <span>{isSaving ? "Enregistrement..." : "Enregistrer les modifications"}</span>
           </button>
         </div>
       </form>

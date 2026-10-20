@@ -6,11 +6,14 @@ import com.team.backend.dto.InterviewDTO;
 import com.team.backend.dto.TestAttemptDTO;
 import com.team.backend.entity.*;
 import com.team.backend.entity.enums.ApplicationStatus;
+import com.team.backend.entity.enums.InterviewStatus;
 import com.team.backend.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -26,19 +29,19 @@ public class ApplicationService {
     private CandidateProfileRepository candidateProfileRepository;
 
     @Autowired
-    private JobOfferRepository jobOfferRepository;
+    private CompanyProfileRepository companyProfileRepository;
 
     @Autowired
-    private CompanyProfileRepository companyProfileRepository;
+    private JobOfferRepository jobOfferRepository;
 
     @Autowired
     private InterviewRepository interviewRepository;
 
     @Autowired
-    private TestAttemptRepository testAttemptRepository;
+    private TestRepository testRepository;
 
     @Autowired
-    private TestRepository testRepository;
+    private TestAttemptRepository testAttemptRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -46,7 +49,7 @@ public class ApplicationService {
     @Transactional
     public ApplicationResponseDTO apply(ApplyRequest req) {
         if (req.getUserId() == null || req.getJobOfferId() == null) {
-            throw new RuntimeException("L'identifiant de l'utilisateur et de l'offre sont requis.");
+            throw new RuntimeException("Paramètres de candidature incomplets.");
         }
 
         // 1. Get or create candidate profile for user
@@ -95,6 +98,75 @@ public class ApplicationService {
         }).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<ApplicationResponseDTO> getCompanyApplications(Long companyUserId) {
+        Optional<CompanyProfile> compOpt = companyProfileRepository.findByUserId(companyUserId);
+        if (compOpt.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        CompanyProfile company = compOpt.get();
+        List<JobOffer> offers = jobOfferRepository.findByCompanyIdOrderByCreatedAtDesc(company.getId());
+        if (offers.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ApplicationResponseDTO> result = new ArrayList<>();
+        for (JobOffer job : offers) {
+            List<Application> apps = applicationRepository.findByJobOfferIdOrderByApplicationDateDesc(job.getId());
+            for (Application app : apps) {
+                CandidateProfile candidate = candidateProfileRepository.findById(app.getCandidateId()).orElse(null);
+                result.add(toDTO(app, candidate, job));
+            }
+        }
+        return result;
+    }
+
+    @Transactional
+    public ApplicationResponseDTO updateApplicationStatus(Long applicationId, String statusStr) {
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Candidature introuvable"));
+
+        try {
+            app.setStatus(ApplicationStatus.valueOf(statusStr.toUpperCase()));
+        } catch (Exception e) {
+            throw new RuntimeException("Statut invalide : " + statusStr);
+        }
+
+        Application updated = applicationRepository.save(app);
+        CandidateProfile candidate = candidateProfileRepository.findById(updated.getCandidateId()).orElse(null);
+        JobOffer job = jobOfferRepository.findById(updated.getJobOfferId()).orElse(null);
+        return toDTO(updated, candidate, job);
+    }
+
+    @Transactional
+    public ApplicationResponseDTO scheduleInterview(Long applicationId, InterviewDTO dto) {
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Candidature introuvable"));
+
+        Interview interview = interviewRepository.findByApplicationId(applicationId)
+                .orElseGet(() -> {
+                    Interview newI = new Interview();
+                    newI.setApplicationId(applicationId);
+                    return newI;
+                });
+
+        interview.setScheduledAt(dto.getScheduledAt() != null ? dto.getScheduledAt() : LocalDateTime.now().plusDays(2));
+        interview.setLocation(dto.getLocation() != null ? dto.getLocation() : "Google Meet");
+        interview.setMeetingUrl(dto.getMeetingUrl() != null ? dto.getMeetingUrl() : "https://meet.google.com/jobflow-interview");
+        interview.setNotes(dto.getNotes() != null ? dto.getNotes() : "Entretien RH & Technique (45 min)");
+        interview.setStatus(InterviewStatus.SCHEDULED);
+
+        interviewRepository.save(interview);
+
+        app.setStatus(ApplicationStatus.SHORTLISTED);
+        Application updated = applicationRepository.save(app);
+
+        CandidateProfile candidate = candidateProfileRepository.findById(updated.getCandidateId()).orElse(null);
+        JobOffer job = jobOfferRepository.findById(updated.getJobOfferId()).orElse(null);
+        return toDTO(updated, candidate, job);
+    }
+
     @Transactional
     public ApplicationResponseDTO withdrawApplication(Long applicationId, Long userId) {
         CandidateProfile candidate = candidateProfileRepository.findByUserId(userId)
@@ -114,7 +186,7 @@ public class ApplicationService {
         return toDTO(updated, candidate, job);
     }
 
-    private ApplicationResponseDTO toDTO(Application app, CandidateProfile candidate, JobOffer job) {
+    public ApplicationResponseDTO toDTO(Application app, CandidateProfile candidate, JobOffer job) {
         ApplicationResponseDTO dto = new ApplicationResponseDTO();
         dto.setId(app.getId());
         dto.setCandidateId(app.getCandidateId());

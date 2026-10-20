@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../../data/dbStore';
+import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Check } from 'lucide-react';
 import './JobOfferForm.css';
@@ -9,27 +10,61 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
     description: initialData?.description || '',
-    contract_type: initialData?.contract_type || 'FULL_TIME',
+    contract_type: initialData?.contract_type || initialData?.contractType || 'FULL_TIME',
     location: initialData?.location || '',
-    salary_min: initialData?.salary_min || '',
-    salary_max: initialData?.salary_max || '',
+    salary_min: initialData?.salary_min || initialData?.salaryMin || '',
+    salary_max: initialData?.salary_max || initialData?.salaryMax || '',
     status: initialData?.status || 'PUBLISHED'
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (initialData?.id) {
-      const updated = db.updateJobOffer(initialData.id, formData);
-      if (onSaved) onSaved(updated);
-    } else {
-      const created = db.createJobOfferForCompany(currentUser, formData);
-      if (onSaved) onSaved(created);
+    setIsSubmitting(true);
+
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      location: formData.location,
+      contractType: formData.contract_type,
+      contract_type: formData.contract_type,
+      salaryMin: formData.salary_min ? Number(formData.salary_min) : null,
+      salaryMax: formData.salary_max ? Number(formData.salary_max) : null,
+      salary_min: formData.salary_min ? Number(formData.salary_min) : null,
+      salary_max: formData.salary_max ? Number(formData.salary_max) : null,
+      status: formData.status
+    };
+
+    try {
+      if (initialData?.id) {
+        // Update on backend
+        await api.jobs.update(initialData.id, currentUser.id, payload);
+        const updatedLocal = db.updateJobOffer(initialData.id, formData);
+        if (onSaved) onSaved(updatedLocal);
+      } else {
+        // Create on backend
+        await api.jobs.create(currentUser.id, payload);
+        const createdLocal = db.createJobOfferForCompany(currentUser, formData);
+        if (onSaved) onSaved(createdLocal);
+      }
+    } catch (err) {
+      console.warn("Erreur synchronisation API offre, fallback local:", err);
+      if (initialData?.id) {
+        const updatedLocal = db.updateJobOffer(initialData.id, formData);
+        if (onSaved) onSaved(updatedLocal);
+      } else {
+        const createdLocal = db.createJobOfferForCompany(currentUser, formData);
+        if (onSaved) onSaved(createdLocal);
+      }
+    } finally {
+      setIsSubmitting(false);
+      if (onClose) onClose();
     }
-    if (onClose) onClose();
   };
 
   return (
@@ -54,7 +89,7 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
             {/* title */}
             <div className="form-group full-width">
               <label className="form-label">
-                <span>Titre du poste</span>
+                <span>Titre du poste *</span>
               </label>
               <input 
                 type="text"
@@ -138,7 +173,6 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
               >
                 <option value="PUBLISHED">Publiée & Active (Visible de tous)</option>
                 <option value="DRAFT">Brouillon (Non visible)</option>
-                <option value="PENDING">En attente de révision</option>
                 <option value="CLOSED">Clôturée / Pourvue</option>
               </select>
             </div>
@@ -146,7 +180,7 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
             {/* description */}
             <div className="form-group full-width">
               <label className="form-label">
-                <span>Description détaillée du poste & missions</span>
+                <span>Description détaillée du poste & missions *</span>
               </label>
               <textarea 
                 className="form-textarea"
@@ -163,9 +197,9 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
             <button type="button" className="btn-secondary" onClick={onClose}>
               Annuler
             </button>
-            <button type="submit" className="btn-primary-save">
+            <button type="submit" className="btn-primary-save" disabled={isSubmitting}>
               <Check size={16} />
-              <span>{initialData?.id ? "Mettre à jour l'offre" : "Publier l'offre"}</span>
+              <span>{isSubmitting ? "Enregistrement..." : initialData?.id ? "Mettre à jour l'offre" : "Publier l'offre"}</span>
             </button>
           </div>
         </form>

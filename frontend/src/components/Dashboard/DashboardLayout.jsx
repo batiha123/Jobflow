@@ -5,6 +5,7 @@ import {
   Briefcase, 
   Building2, 
   User, 
+  Users,
   FileCheck2, 
   ShieldCheck, 
   ArrowLeft,
@@ -37,6 +38,7 @@ export function DashboardLayout({
     ],
     ADMIN: [
       { id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },
+      { id: 'users', label: 'Gestion Utilisateurs', icon: Users },
       { id: 'moderation', label: 'Modération & Rapports', icon: ShieldCheck },
     ]
   };

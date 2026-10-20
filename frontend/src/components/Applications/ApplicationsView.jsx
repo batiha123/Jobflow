@@ -50,7 +50,12 @@ export function ApplicationsView({ onStatusChange }) {
     setIsLoading(true);
     try {
       if (isCompany) {
-        setApplications(db.getApplicationsForCompany(currentUser));
+        const liveCompanyApps = await api.applications.getCompanyApplications(currentUser.id, currentUser);
+        if (Array.isArray(liveCompanyApps) && liveCompanyApps.length > 0) {
+          setApplications(liveCompanyApps);
+        } else {
+          setApplications(db.getApplicationsForCompany(currentUser));
+        }
       } else {
         // Fetch from real MySQL backend via REST API
         const liveApps = await api.applications.getCandidateApplications(currentUser.id, currentUser);
@@ -63,7 +68,11 @@ export function ApplicationsView({ onStatusChange }) {
       }
     } catch (err) {
       console.warn("Connexion API candidatures échouée, fallback local:", err);
-      setApplications(db.getApplicationsForCandidate(currentUser));
+      if (isCompany) {
+        setApplications(db.getApplicationsForCompany(currentUser));
+      } else {
+        setApplications(db.getApplicationsForCandidate(currentUser));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +82,12 @@ export function ApplicationsView({ onStatusChange }) {
     loadData();
   }, [currentUser]);
 
-  const handleUpdateStatus = (appId, newStatus) => {
+  const handleUpdateStatus = async (appId, newStatus) => {
+    try {
+      await api.applications.updateStatus(appId, newStatus);
+    } catch (err) {
+      console.warn("Échec mise à jour statut distant, fallback local:", err);
+    }
     db.updateApplicationStatus(appId, newStatus);
     loadData();
     if (onStatusChange) onStatusChange();
@@ -95,9 +109,20 @@ export function ApplicationsView({ onStatusChange }) {
     if (onStatusChange) onStatusChange();
   };
 
-  const handleScheduleSubmit = (e) => {
+  const handleScheduleSubmit = async (e) => {
     e.preventDefault();
     if (!scheduleModalApp) return;
+
+    try {
+      await api.applications.scheduleInterview(scheduleModalApp.id, {
+        scheduledAt: interviewDate,
+        location: 'Google Meet',
+        meetingUrl: meetingUrl,
+        notes: 'Entretien RH et technique d’une durée de 45 minutes.'
+      });
+    } catch (err) {
+      console.warn("Échec planification entretien API, synchronisation locale:", err);
+    }
 
     db.scheduleInterview({
       application_id: scheduleModalApp.id,
