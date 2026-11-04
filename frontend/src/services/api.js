@@ -1,113 +1,172 @@
 /**
- * JobFlow API Client
- * Communicates with the real Spring Boot backend via /api (port 8080)
- * Gracefully falls back to dbStore if offline.
+ * JobFlow API Client — Ready Template for Backend Integration
+ * 
+ * Instructions for the team:
+ * Once you create your Spring Boot Controllers (in com.team.backend.controller),
+ * replace these placeholder methods with actual fetch() or axios calls.
  */
-import { db } from '../data/dbStore';
 
-const BASE_URL = '/api';
-
-async function request(endpoint, options = {}, fallbackFn) {
-  try {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      },
-      ...options
-    });
-
-    if (res.ok) {
-      return await res.json();
-    }
-
-    // Try to parse error message from Spring Boot
-    const errorBody = await res.json().catch(() => null);
-    if (errorBody && errorBody.message) {
-      throw new Error(errorBody.message);
-    }
-    throw new Error(`Erreur serveur (${res.status})`);
-  } catch (err) {
-    // If it's a specific validation message from backend, propagate it
-    if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
-      throw err;
-    }
-    // Network offline fallback
-    if (fallbackFn) {
-      return fallbackFn();
-    }
-    throw err;
-  }
-}
+export const BASE_URL = 'http://localhost:8080/api';
 
 export const api = {
-  // 1. Candidate Profile & CV
-  candidates: {
-    getProfile: (userId) => 
-      request(`/candidates/user/${userId}`, { method: 'GET' }, () => db.getCandidateProfileByUser({ id: userId })),
-    
-    updateProfile: (userId, profileData) => 
-      request(`/candidates/user/${userId}`, { method: 'PUT', body: JSON.stringify(profileData) }, () => db.updateCandidateProfileByUser({ id: userId }, profileData)),
-    
-    uploadCv: (userId, cvUrl) => 
-      request(`/candidates/upload-cv/${userId}`, { method: 'POST', body: JSON.stringify({ cvUrl }) }, () => ({ message: 'CV enregistré', cvUrl }))
-  },
-
-  // 2. Job Offers
-  jobs: {
-    getAll: (params = {}) => {
-      const q = new URLSearchParams();
-      if (params.keyword) q.set('keyword', params.keyword);
-      if (params.location) q.set('location', params.location);
-      if (params.contractType) q.set('contractType', params.contractType);
-      const queryStr = q.toString() ? `?${q.toString()}` : '';
-      return request(`/jobs${queryStr}`, { method: 'GET' }, () => db.getJobOffers());
+  // 1. Authentication (/api/auth)
+  auth: {
+    /**
+     * POST /api/auth/login
+     * @param {string} email
+     * @param {string} password
+     */
+    login: async (email, password) => {
+      console.log('[API] auth.login placeholder:', { email });
+      // TODO: Connect to POST /api/auth/login
+      return { id: 1, email, name: email.split('@')[0], role: 'CANDIDATE' };
     },
 
-    getById: (id) => 
-      request(`/jobs/${id}`, { method: 'GET' }, () => db.getJobOffers().find(o => o.id === Number(id))),
-
-    create: (user, jobData) => 
-      request('/jobs', { method: 'POST', body: JSON.stringify(jobData) }, () => db.createJobOfferForCompany(user, jobData)),
-
-    update: (id, jobData) => 
-      request(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(jobData) }, () => db.updateJobOffer(id, jobData)),
-
-    delete: (id) => 
-      request(`/jobs/${id}`, { method: 'DELETE' }, () => db.deleteJobOffer(id))
+    /**
+     * POST /api/auth/register
+     * @param {Object} userData - { name, email, password, role, companyName }
+     */
+    register: async (userData) => {
+      console.log('[API] auth.register placeholder:', userData);
+      // TODO: Connect to POST /api/auth/register
+      return { id: Date.now(), ...userData };
+    }
   },
 
-  // 3. Applications & Workflow
+  // 2. Candidate Profiles & CV (/api/candidates)
+  candidates: {
+    /**
+     * GET /api/candidates/user/{userId}
+     */
+    getProfile: async (userId) => {
+      console.log('[API] candidates.getProfile placeholder for userId:', userId);
+      // TODO: Connect to GET /api/candidates/user/{userId}
+      return null;
+    },
+
+    /**
+     * PUT /api/candidates/user/{userId}
+     */
+    updateProfile: async (userId, profileData) => {
+      console.log('[API] candidates.updateProfile placeholder for userId:', userId, profileData);
+      // TODO: Connect to PUT /api/candidates/user/{userId}
+      return { ...profileData, userId };
+    },
+
+    /**
+     * POST /api/candidates/upload-cv/{userId}
+     */
+    uploadCv: async (userId, cvUrl) => {
+      console.log('[API] candidates.uploadCv placeholder for userId:', userId, cvUrl);
+      // TODO: Connect to POST /api/candidates/upload-cv/{userId}
+      return { message: 'CV enregistré', cvUrl };
+    }
+  },
+
+  // 3. Job Offers (/api/jobs)
+  jobs: {
+    /**
+     * GET /api/jobs?keyword=&location=&contractType=
+     */
+    getAll: async (params = {}) => {
+      console.log('[API] jobs.getAll placeholder with params:', params);
+      // TODO: Connect to GET /api/jobs
+      return [];
+    },
+
+    /**
+     * GET /api/jobs/{id}
+     */
+    getById: async (id) => {
+      console.log('[API] jobs.getById placeholder for id:', id);
+      // TODO: Connect to GET /api/jobs/{id}
+      return null;
+    },
+
+    /**
+     * POST /api/jobs
+     */
+    create: async (jobData) => {
+      console.log('[API] jobs.create placeholder with:', jobData);
+      // TODO: Connect to POST /api/jobs
+      return { id: Date.now(), ...jobData };
+    },
+
+    /**
+     * PUT /api/jobs/{id}
+     */
+    update: async (id, jobData) => {
+      console.log('[API] jobs.update placeholder for id:', id, jobData);
+      // TODO: Connect to PUT /api/jobs/{id}
+      return { id, ...jobData };
+    },
+
+    /**
+     * DELETE /api/jobs/{id}
+     */
+    delete: async (id) => {
+      console.log('[API] jobs.delete placeholder for id:', id);
+      // TODO: Connect to DELETE /api/jobs/{id}
+      return { message: 'Offre supprimée' };
+    }
+  },
+
+  // 4. Applications (/api/applications)
   applications: {
-    apply: ({ userId, jobOfferId, motivationMessage, cvUrl }) => 
-      request('/applications/apply', { 
-        method: 'POST', 
-        body: JSON.stringify({ userId, jobOfferId, motivationMessage, cvUrl }) 
-      }, () => db.submitApplication({ candidate_id: userId, job_offer_id: jobOfferId, motivation_message: motivationMessage, cv_url: cvUrl })),
+    /**
+     * POST /api/applications/apply
+     */
+    apply: async ({ userId, jobOfferId, motivationMessage, cvUrl }) => {
+      console.log('[API] applications.apply placeholder with:', { userId, jobOfferId, motivationMessage, cvUrl });
+      // TODO: Connect to POST /api/applications/apply
+      return { id: Date.now(), userId, jobOfferId, status: 'SUBMITTED' };
+    },
 
-    getCandidateApplications: (userId, userObj) => 
-      request(`/applications/candidate/${userId}`, { method: 'GET' }, () => db.getApplicationsForCandidate(userObj || { id: userId })),
+    /**
+     * GET /api/applications/candidate/{userId}
+     */
+    getCandidateApplications: async (userId) => {
+      console.log('[API] applications.getCandidateApplications placeholder for userId:', userId);
+      // TODO: Connect to GET /api/applications/candidate/{userId}
+      return [];
+    },
 
-    withdraw: (applicationId, userId) => 
-      request(`/applications/${applicationId}/withdraw?userId=${userId}`, { method: 'PUT' }, () => {
-        db.updateApplicationStatus(applicationId, 'WITHDRAWN');
-        return { id: applicationId, status: 'WITHDRAWN' };
-      })
+    /**
+     * PUT /api/applications/{id}/withdraw?userId={userId}
+     */
+    withdraw: async (applicationId, userId) => {
+      console.log('[API] applications.withdraw placeholder for appId:', applicationId, userId);
+      // TODO: Connect to PUT /api/applications/{id}/withdraw
+      return { id: applicationId, status: 'WITHDRAWN' };
+    }
   },
 
-  // 4. Assessment Tests
+  // 5. Technical Assessment Tests (/api/tests)
   tests: {
-    getAll: () => 
-      request('/tests', { method: 'GET' }, () => []),
+    /**
+     * GET /api/tests
+     */
+    getAll: async () => {
+      // TODO: Connect to GET /api/tests
+      return [];
+    },
 
-    getForJob: (jobOfferId) => 
-      request(`/tests/job/${jobOfferId}`, { method: 'GET' }, () => []),
+    /**
+     * GET /api/tests/job/{jobOfferId}
+     */
+    getForJob: async (jobOfferId) => {
+      // TODO: Connect to GET /api/tests/job/{jobOfferId}
+      return [];
+    },
 
-    submit: ({ testId, applicationId, score }) => 
-      request('/tests/submit', { 
-        method: 'POST', 
-        body: JSON.stringify({ testId, applicationId, score }) 
-      }, () => ({ id: 1, testId, score, status: 'COMPLETED' }))
+    /**
+     * POST /api/tests/submit
+     */
+    submit: async ({ testId, applicationId, score }) => {
+      console.log('[API] tests.submit placeholder with:', { testId, applicationId, score });
+      // TODO: Connect to POST /api/tests/submit
+      return { id: Date.now(), testId, applicationId, score, status: 'COMPLETED' };
+    }
   }
 };
 

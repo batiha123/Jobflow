@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, AlertTriangle, Clock, Award, ArrowRight, HelpCircle } from 'lucide-react';
-import { api } from '../../services/api';
 import './TestModal.css';
 
 const DEFAULT_QUESTIONS = [
@@ -105,11 +104,8 @@ export function TestModal({ test, application, onClose, onTestCompleted }) {
       const testId = test?.id || 1;
       const applicationId = application?.id || 1;
       
-      await api.tests.submit({
-        testId: testId,
-        applicationId: applicationId,
-        score: scorePercentage
-      });
+      // TODO (Team): Connect to backend (e.g. POST /api/tests/submit) when ready
+      console.log('[TestModal] Submitting test result:', { testId, applicationId, score: scorePercentage });
 
       if (onTestCompleted) {
         onTestCompleted({

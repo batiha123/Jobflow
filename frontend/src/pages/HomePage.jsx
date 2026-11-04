@@ -8,7 +8,6 @@ import { JobDetailModal } from '../components/JobDetailModal/JobDetailModal';
 import { useToast } from '../components/Toast/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
-import { api } from '../services/api';
 import { ArrowRight, MapPin, Building2, CheckCircle2, X, FileText, AlertCircle } from 'lucide-react';
 import './HomePage.css';
 
@@ -30,24 +29,12 @@ export function HomePage() {
   const [applyError, setApplyError] = useState(null);
 
   useEffect(() => {
-    const loadOffers = async () => {
-      try {
-        const liveOffers = await api.jobs.getAll();
-        if (Array.isArray(liveOffers) && liveOffers.length > 0) {
-          setOffers(liveOffers);
-        } else {
-          setOffers(db.getJobOffers());
-        }
-      } catch (err) {
-        setOffers(db.getJobOffers());
-      }
-    };
-
-    loadOffers();
+    // TODO (Team): Connect to backend (e.g. GET /api/jobs) when ready
+    setOffers(db.getJobOffers());
     setCompanies(db.getCompanyProfiles());
   }, []);
 
-  const handleApplyClick = async (offer) => {
+  const handleApplyClick = (offer) => {
     if (!currentUser) {
       toast.error("Veuillez vous connecter avec votre compte candidat pour postuler.");
       return;
@@ -63,16 +50,11 @@ export function HomePage() {
     setApplyError(null);
     setMotivation('');
 
-    // Fetch candidate profile to retrieve attached CV
-    try {
-      const prof = await api.candidates.getProfile(currentUser.id);
-      setCandidateProfile(prof);
-    } catch (err) {
-      setCandidateProfile(db.getCandidateProfileByUser(currentUser));
-    }
+    // TODO (Team): Connect to backend (e.g. GET /api/candidates/user/{id}) when ready
+    setCandidateProfile(db.getCandidateProfileByUser(currentUser));
   };
 
-  const handleConfirmApply = async (e) => {
+  const handleConfirmApply = (e) => {
     e.preventDefault();
     if (!applyModalOffer || !currentUser) return;
 
@@ -81,42 +63,26 @@ export function HomePage() {
 
     const cvUrlToUse = candidateProfile?.cv_url || 'https://jobflow.com/resumes/candidat_cv.pdf';
 
-    try {
-      // 1. Submit to real Spring Boot backend
-      await api.applications.apply({
-        userId: currentUser.id,
-        jobOfferId: applyModalOffer.id,
-        motivationMessage: motivation,
-        cvUrl: cvUrlToUse
-      });
+    // TODO (Team): Connect to backend (e.g. POST /api/applications/apply) when ready
+    db.submitApplication({
+      candidate: currentUser,
+      candidate_id: currentUser.id,
+      candidate_email: currentUser.email,
+      candidate_name: currentUser.name,
+      job_offer_id: applyModalOffer.id,
+      motivation_message: motivation,
+      cv_url: cvUrlToUse
+    });
 
-      // 2. Also sync local dbStore
-      db.submitApplication({
-        candidate: currentUser,
-        candidate_id: currentUser.id,
-        candidate_email: currentUser.email,
-        candidate_name: currentUser.name,
-        job_offer_id: applyModalOffer.id,
-        motivation_message: motivation,
-        cv_url: cvUrlToUse
-      });
+    setAppliedSuccess(true);
+    toast.success("🎉 Candidature transmise avec succès à l'entreprise !");
 
-      setAppliedSuccess(true);
-      toast.success("🎉 Candidature transmise avec succès à l'entreprise !");
-
-      setTimeout(() => {
-        setApplyModalOffer(null);
-        setAppliedSuccess(false);
-        navigate('/tableau-de-bord');
-      }, 1500);
-    } catch (err) {
-      console.error("Erreur candidature:", err);
-      const errMsg = err.message || "Erreur lors de l'envoi de la candidature.";
-      setApplyError(errMsg);
-      toast.error(errMsg);
-    } finally {
-      setIsApplying(false);
-    }
+    setTimeout(() => {
+      setApplyModalOffer(null);
+      setAppliedSuccess(false);
+      navigate('/tableau-de-bord');
+    }, 1200);
+    setIsApplying(false);
   };
 
   return (

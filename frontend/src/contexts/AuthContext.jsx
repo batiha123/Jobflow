@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import { db } from '../data/dbStore';
 
 const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = 'jobflow_user_session';
@@ -22,44 +23,43 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * TODO (Team): Connect to Spring Boot AuthController
+   * Endpoint: POST /api/auth/login
+   * Body: { email, password }
+   */
   const login = async (email, password) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      throw new Error(err?.message || "Email ou mot de passe incorrect.");
-    }
-
-    const userData = await res.json();
+    console.log('[AuthContext] login placeholder called with:', { email });
+    // Local mock authentication: match existing user or generate session
+    const users = db.getUsers();
+    const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const userData = existing || {
+      id: Date.now(),
+      name: email.split('@')[0],
+      email: email,
+      role: email.includes('admin') ? 'ADMIN' : email.includes('company') || email.includes('novatech') ? 'COMPANY' : 'CANDIDATE'
+    };
     saveUserSession(userData);
     return userData;
   };
 
+  /**
+   * TODO (Team): Connect to Spring Boot AuthController
+   * Endpoint: POST /api/auth/register
+   * Body: { name, email, password, role, companyName }
+   */
   const signup = async ({ name, email, password, role = 'CANDIDATE', company_name = '' }) => {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        role,
-        companyName: company_name
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      throw new Error(err?.message || "Impossible de créer le compte. Vérifiez vos informations.");
-    }
-
-    const userData = await res.json();
-    saveUserSession(userData);
-    return userData;
+    console.log('[AuthContext] signup placeholder called with:', { name, email, role, company_name });
+    // Local mock registration:
+    const newUser = {
+      id: Date.now(),
+      name,
+      email,
+      role,
+      companyName: company_name
+    };
+    saveUserSession(newUser);
+    return newUser;
   };
 
   const logout = () => {
