@@ -137,19 +137,6 @@ export const api = {
     }
   },
 
-  // 2b. Admin Profiles (/api/admin-profiles) — Person 1
-  adminProfiles: {
-    getProfile: async (userId) => {
-      return request(`/admin-profiles/${userId}`, { method: 'GET' });
-    },
-    updateProfile: async (userId, profileData) => {
-      return request(`/admin-profiles/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify(profileData)
-      });
-    }
-  },
-
   // 3. Job Offers (/api/jobs)
   jobs: {
     /**
