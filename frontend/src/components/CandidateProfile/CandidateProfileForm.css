@@ -5,21 +5,11 @@
 .candidate-profile-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   padding: 36px;
-  box-shadow:
-    0 20px 45px -16px rgba(15, 23, 42, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.8) inset;
-  max-width: 880px;
+  box-shadow: var(--shadow-sm);
+  max-width: 860px;
   margin: 0 auto;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
-}
-
-.candidate-profile-card:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 28px 58px -18px rgba(79, 70, 229, 0.14),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 .candidate-avatar-preview-row {
