@@ -6,61 +6,10 @@
  * replace these placeholder methods with actual fetch() or axios calls.
  */
 
-export const BASE_URL = '/api';
-const TOKEN_STORAGE_KEY = 'jobflow_jwt_token';
-
-const STATUS_MESSAGES_FR = {
-  400: 'Les informations saisies sont invalides. Veuillez vérifier vos champs.',
-  401: 'Identifiants incorrects ou session expirée. Veuillez vous reconnecter.',
-  403: "Accès refusé. Vous n'avez pas les droits nécessaires pour cette action.",
-  404: 'Aucun compte ou élément correspondant trouvé.',
-  409: 'Ce compte ou cet email existe déjà.',
-  500: 'Une erreur interne est survenue sur le serveur.',
-  502: 'Le serveur backend redémarre ou est inaccessible. Réessayez dans un instant.',
-  503: 'Service temporairement indisponible. Veuillez réessayer.'
-};
-
-async function request(endpoint, options = {}) {
-  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers || {})
-  };
-
-  let response;
-  try {
-    response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers
-    });
-  } catch {
-    throw new Error(
-      'Impossible de contacter le serveur JobFlow. Vérifiez que le backend Spring Boot est bien démarré.'
-    );
-  }
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok || (payload && payload.success === false)) {
-    const validationDetails =
-      payload?.data && typeof payload.data === 'object'
-        ? Object.values(payload.data).join(' • ')
-        : null;
-
-    const errorMessage =
-      validationDetails ||
-      payload?.message ||
-      STATUS_MESSAGES_FR[response.status] ||
-      'Une erreur est survenue lors du traitement de votre demande.';
-    throw new Error(errorMessage);
-  }
-
-  return payload?.data !== undefined ? payload.data : payload;
-}
+export const BASE_URL = 'http://localhost:8080/api';
 
 export const api = {
-  // 1. Authentication (/api/auth) — Person 1
+  // 1. Authentication (/api/auth)
   auth: {
     /**
      * POST /api/auth/login
@@ -68,63 +17,40 @@ export const api = {
      * @param {string} password
      */
     login: async (email, password) => {
-      return request('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
+      console.log('[API] auth.login placeholder:', { email });
+      // TODO: Connect to POST /api/auth/login
+      return { id: 1, email, name: email.split('@')[0], role: 'CANDIDATE' };
     },
 
     /**
      * POST /api/auth/register
-     * @param {Object} userData - { name, email, password, phone, role, companyName }
+     * @param {Object} userData - { name, email, password, role, companyName }
      */
     register: async (userData) => {
-      return request('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(userData)
-      });
+      console.log('[API] auth.register placeholder:', userData);
+      // TODO: Connect to POST /api/auth/register
+      return { id: Date.now(), ...userData };
     }
   },
 
-  // 1b. Users Management (/api/users) — Person 1
-  users: {
-    getMe: async () => {
-      return request('/users/me', { method: 'GET' });
-    },
-    updateMe: async (userData) => {
-      return request('/users/me', {
-        method: 'PUT',
-        body: JSON.stringify(userData)
-      });
-    },
-    getAll: async () => {
-      return request('/users', { method: 'GET' });
-    },
-    activate: async (userId) => {
-      return request(`/users/${userId}/activate`, { method: 'PATCH' });
-    },
-    suspend: async (userId) => {
-      return request(`/users/${userId}/suspend`, { method: 'PATCH' });
-    }
-  },
-
-  // 2. Candidate Profiles & CV (/api/candidate-profiles & /api/candidates) — Person 1
+  // 2. Candidate Profiles & CV (/api/candidates)
   candidates: {
     /**
-     * GET /api/candidate-profiles/{userId}
+     * GET /api/candidates/user/{userId}
      */
     getProfile: async (userId) => {
-      return request(`/candidate-profiles/${userId}`, { method: 'GET' });
+      console.log('[API] candidates.getProfile placeholder for userId:', userId);
+      // TODO: Connect to GET /api/candidates/user/{userId}
+      return null;
     },
 
     /**
-     * PUT /api/candidate-profiles/{userId}
+     * PUT /api/candidates/user/{userId}
      */
     updateProfile: async (userId, profileData) => {
-      return request(`/candidate-profiles/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify(profileData)
-      });
+      console.log('[API] candidates.updateProfile placeholder for userId:', userId, profileData);
+      // TODO: Connect to PUT /api/candidates/user/{userId}
+      return { ...profileData, userId };
     },
 
     /**
