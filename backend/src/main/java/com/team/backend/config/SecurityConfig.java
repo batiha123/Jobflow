@@ -86,7 +86,8 @@ public class SecurityConfig {
 
                 // 5. Person 1 protected endpoints (Users, Candidate Profiles, Admin Profiles)
                 .requestMatchers("/api/admin-profiles/**").hasRole("ADMIN")
-                .requestMatchers("/api/users/**").authenticated()
+                .requestMatchers("/api/users/me").authenticated()
+                .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/candidate-profiles/**", "/api/candidates/**").authenticated()
 
                 // 6. Keep teammates' endpoints accessible during team development

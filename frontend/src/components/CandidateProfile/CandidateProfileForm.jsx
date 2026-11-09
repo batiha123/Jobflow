@@ -7,7 +7,7 @@ import '../CompanyProfile/CompanyProfileForm.css';
 import './CandidateProfileForm.css';
 
 export function CandidateProfileForm({ onProfileUpdated }) {
-  const { currentUser } = useAuth();
+  const { currentUser, updateCurrentUserSession } = useAuth();
   const fileInputRef = useRef(null);
   const cvInputRef = useRef(null);
 
@@ -148,6 +148,12 @@ export function CandidateProfileForm({ onProfileUpdated }) {
           photoUrl: profile.photo_url,
           cvUrl: profile.cv_url
         });
+        if (updateCurrentUserSession) {
+          updateCurrentUserSession({
+            name: profile.name,
+            phone: profile.phone
+          });
+        }
       }
 
       // 2. Also sync local dbStore
