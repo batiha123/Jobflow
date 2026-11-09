@@ -4,6 +4,7 @@ import { Navbar } from '../components/Navbar/Navbar';
 import { DashboardLayout } from '../components/Dashboard/DashboardLayout';
 import { CompanyProfileForm } from '../components/CompanyProfile/CompanyProfileForm';
 import { CandidateProfileForm } from '../components/CandidateProfile/CandidateProfileForm';
+import { AdminProfileForm } from '../components/AdminProfile/AdminProfileForm';
 import { JobOfferForm } from '../components/JobOfferModal/JobOfferForm';
 import { ApplicationsView } from '../components/Applications/ApplicationsView';
 import { AuthModal } from '../components/AuthModal/AuthModal';
@@ -340,6 +341,11 @@ export function DashboardPage() {
             )}
             {currentRole === 'CANDIDATE' && (
               <CandidateProfileForm
+                onProfileUpdated={() => refreshData()}
+              />
+            )}
+            {currentRole === 'ADMIN' && (
+              <AdminProfileForm
                 onProfileUpdated={() => refreshData()}
               />
             )}

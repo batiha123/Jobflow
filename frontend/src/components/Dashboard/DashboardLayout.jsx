@@ -37,6 +37,7 @@ export function DashboardLayout({
     ],
     ADMIN: [
       { id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },
+      { id: 'profile', label: 'Profil & Utilisateurs', icon: User },
       { id: 'moderation', label: 'Modération & Rapports', icon: ShieldCheck },
     ]
   };
