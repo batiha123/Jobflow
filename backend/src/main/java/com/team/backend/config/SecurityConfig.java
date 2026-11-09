@@ -84,8 +84,7 @@ public class SecurityConfig {
                 // 4. Preflight CORS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // 5. Person 1 protected endpoints (Users, Candidate Profiles, Admin Profiles)
-                .requestMatchers("/api/admin-profiles/**").hasRole("ADMIN")
+                // 5. Person 1 protected endpoints (Users & Candidate Profiles)
                 .requestMatchers("/api/users/me").authenticated()
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/candidate-profiles/**", "/api/candidates/**").authenticated()

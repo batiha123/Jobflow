@@ -8,7 +8,6 @@ import { JobOfferForm } from '../components/JobOfferModal/JobOfferForm';
 import { ApplicationsView } from '../components/Applications/ApplicationsView';
 import { AuthModal } from '../components/AuthModal/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../services/api';
 import { db } from '../data/dbStore';
 import { 
   Briefcase, 
@@ -51,18 +50,6 @@ export function DashboardPage() {
       const prof = db.getCandidateProfileByUser(currentUser);
       setMyApplications(apps);
       setCandidateProfile(prof);
-      if (currentUser.id) {
-        api.candidates.getProfile(currentUser.id)
-          .then((backendProf) => {
-            if (backendProf) {
-              setCandidateProfile({
-                ...backendProf,
-                about_me: backendProf.aboutMe || backendProf.about_me || ''
-              });
-            }
-          })
-          .catch(() => {});
-      }
     } else if (currentRole === 'ADMIN') {
       setGlobalStats({
         users: db.getUsers().length,
