@@ -117,7 +117,8 @@ This project is developed collaboratively using Git and GitHub.
 - Database schema changes should be shared through updated SQL scripts or database migrations.
 - Never commit passwords, API keys, or other sensitive credentials.
 
-## 📌 Project Status
+## 📌 Project Status 
+ - underprocess
 
 The project is under development. Features and implementation details may evolve as development progresses.
 
