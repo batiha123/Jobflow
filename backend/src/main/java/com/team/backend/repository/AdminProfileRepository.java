@@ -13,3 +13,4 @@ public interface AdminProfileRepository extends JpaRepository<AdminProfile, Long
 
     boolean existsByUserId(Long userId);
 }
+

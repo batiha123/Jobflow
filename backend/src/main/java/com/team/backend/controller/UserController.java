@@ -74,3 +74,4 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("Statut du compte mis à jour", dto));
     }
 }
+

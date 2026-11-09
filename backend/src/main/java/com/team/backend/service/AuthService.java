@@ -84,10 +84,12 @@ public class AuthService {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
 
         User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new IllegalArgumentException("Email ou mot de passe incorrect."));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Aucun compte n'existe avec cette adresse email (" + normalizedEmail + "). Veuillez vérifier votre email ou créer un compte."
+                ));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Email ou mot de passe incorrect.");
+            throw new IllegalArgumentException("Mot de passe incorrect. Veuillez vérifier votre mot de passe et réessayer.");
         }
 
         if (user.getAccountStatus() == AccountStatus.SUSPENDED) {
@@ -107,3 +109,4 @@ public class AuthService {
         return new AuthDto.AuthResponse(token, UserDto.fromEntity(user));
     }
 }
+

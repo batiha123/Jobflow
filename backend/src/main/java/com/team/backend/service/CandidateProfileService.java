@@ -95,3 +95,4 @@ public class CandidateProfileService {
         return CandidateProfileDto.fromEntities(saved, user);
     }
 }
+

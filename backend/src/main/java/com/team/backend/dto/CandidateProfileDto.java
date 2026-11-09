@@ -238,3 +238,4 @@ public class CandidateProfileDto {
         this.updatedAt = updatedAt;
     }
 }
+

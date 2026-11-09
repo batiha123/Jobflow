@@ -3,6 +3,7 @@ import { db } from '../../data/dbStore';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Save, CheckCircle2, Upload, Trash2, Camera, FileText, Download, Eye, Check } from 'lucide-react';
+import Swal from 'sweetalert2';
 import '../CompanyProfile/CompanyProfileForm.css';
 import './CandidateProfileForm.css';
 
@@ -88,7 +89,12 @@ export function CandidateProfileForm({ onProfileUpdated }) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("La taille du fichier photo ne doit pas dépasser 5 Mo.");
+      Swal.fire({
+        icon: 'warning',
+        title: 'Fichier trop volumineux',
+        text: 'La taille du fichier photo ne doit pas dépasser 5 Mo.',
+        confirmButtonColor: '#4f46e5'
+      });
       return;
     }
 
@@ -110,7 +116,12 @@ export function CandidateProfileForm({ onProfileUpdated }) {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert("La taille du CV ne doit pas dépasser 10 Mo.");
+      Swal.fire({
+        icon: 'warning',
+        title: 'CV trop volumineux',
+        text: 'La taille du CV ne doit pas dépasser 10 Mo.',
+        confirmButtonColor: '#4f46e5'
+      });
       return;
     }
 
@@ -160,14 +171,23 @@ export function CandidateProfileForm({ onProfileUpdated }) {
       db.updateCandidateProfileByUser(currentUser, profile);
 
       setSavedSuccess(true);
+      Swal.fire({
+        icon: 'success',
+        title: 'Profil mis à jour !',
+        text: 'Vos informations candidat et votre CV ont été enregistrés avec succès.',
+        timer: 2000,
+        showConfirmButton: false
+      });
       if (onProfileUpdated) onProfileUpdated();
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch (err) {
       console.error("Erreur de sauvegarde:", err);
-      // Fallback save in dbStore
-      db.updateCandidateProfileByUser(currentUser, profile);
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 4000);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur de sauvegarde',
+        text: err?.message || 'Impossible de sauvegarder votre profil candidat.',
+        confirmButtonColor: '#4f46e5'
+      });
     } finally {
       setIsSaving(false);
     }

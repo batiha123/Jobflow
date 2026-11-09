@@ -91,3 +91,4 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable avec l'email : " + email));
     }
 }
+

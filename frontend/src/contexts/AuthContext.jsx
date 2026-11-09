@@ -47,11 +47,12 @@ export function AuthProvider({ children }) {
    * Endpoint: POST /api/auth/register
    * Body: { name, email, password, role, companyName }
    */
-  const signup = async ({ name, email, password, role = 'CANDIDATE', company_name = '' }) => {
+  const signup = async ({ name, email, password, phone = '', role = 'CANDIDATE', company_name = '' }) => {
     const authData = await api.auth.register({
       name,
       email,
       password,
+      phone,
       role,
       companyName: company_name
     });

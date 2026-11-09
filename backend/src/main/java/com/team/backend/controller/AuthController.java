@@ -39,3 +39,4 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Connexion réussie", response));
     }
 }
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, ArrowRight, Eye, EyeOff, Sparkles, ShieldCheck, Briefcase } from 'lucide-react';
+import Swal from 'sweetalert2';
 import './AuthModal.css';
 
 export function AuthModal({ initialMode = 'login', onClose, onSuccess }) {
@@ -36,11 +37,28 @@ export function AuthModal({ initialMode = 'login', onClose, onSuccess }) {
     setError('');
     setIsSubmitting(true);
     try {
-      await login(loginEmail, loginPassword);
+      const user = await login(loginEmail, loginPassword);
+      Swal.fire({
+        icon: 'success',
+        title: `Bienvenue, ${user?.name || ''} !`,
+        text: 'Connexion réussie à votre espace JobFlow.',
+        timer: 2000,
+        showConfirmButton: false
+      });
       if (onSuccess) onSuccess();
       if (onClose) onClose();
     } catch (err) {
-      setError(err.message || 'Email ou mot de passe incorrect.');
+      const realMessage =
+        err?.message ||
+        "Aucun compte n'existe avec cette adresse email ou le mot de passe est incorrect.";
+      setError(realMessage);
+      Swal.fire({
+        icon: 'error',
+        title: 'Échec de connexion',
+        text: realMessage,
+        confirmButtonText: 'Réessayer',
+        confirmButtonColor: '#4f46e5'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -50,12 +68,20 @@ export function AuthModal({ initialMode = 'login', onClose, onSuccess }) {
     e.preventDefault();
     setError('');
     if (registerPassword.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
+      const pwdMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
+      setError(pwdMsg);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Mot de passe trop court',
+        text: pwdMsg,
+        confirmButtonText: 'Corriger',
+        confirmButtonColor: '#4f46e5'
+      });
       return;
     }
     setIsSubmitting(true);
     try {
-      await signup({
+      const newUser = await signup({
         name: registerName,
         email: registerEmail,
         password: registerPassword,
@@ -63,10 +89,25 @@ export function AuthModal({ initialMode = 'login', onClose, onSuccess }) {
         role: registerRole,
         company_name: registerRole === 'COMPANY' ? registerCompanyName : ''
       });
+      Swal.fire({
+        icon: 'success',
+        title: 'Compte créé avec succès !',
+        text: `Bienvenue sur JobFlow, ${newUser?.name || registerName}.`,
+        timer: 2200,
+        showConfirmButton: false
+      });
       if (onSuccess) onSuccess();
       if (onClose) onClose();
     } catch (err) {
-      setError(err.message || 'Erreur lors de la création du compte.');
+      const realMessage = err?.message || 'Erreur lors de la création du compte.';
+      setError(realMessage);
+      Swal.fire({
+        icon: 'error',
+        title: "Impossible de créer le compte",
+        text: realMessage,
+        confirmButtonText: 'Compris',
+        confirmButtonColor: '#4f46e5'
+      });
     } finally {
       setIsSubmitting(false);
     }

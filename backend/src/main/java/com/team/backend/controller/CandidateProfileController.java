@@ -52,3 +52,4 @@ public class CandidateProfileController {
         return ResponseEntity.ok(ApiResponse.ok("Profil candidat mis à jour", dto));
     }
 }
+

@@ -50,3 +50,4 @@ public class AdminProfileController {
         return ResponseEntity.ok(ApiResponse.ok("Profil administrateur mis à jour", dto));
     }
 }
+

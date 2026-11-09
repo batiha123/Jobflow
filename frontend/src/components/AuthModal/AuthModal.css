@@ -373,3 +373,13 @@
     padding: 28px 24px;
   }
 }
+
+.swal2-container {
+  z-index: 99999 !important;
+}
+
+.swal2-popup {
+  border-radius: 22px !important;
+  font-family: inherit !important;
+  box-shadow: 0 28px 60px -12px rgba(15, 23, 42, 0.35) !important;
+}

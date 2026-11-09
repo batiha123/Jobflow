@@ -13,3 +13,4 @@ public interface CandidateProfileRepository extends JpaRepository<CandidateProfi
 
     boolean existsByUserId(Long userId);
 }
+

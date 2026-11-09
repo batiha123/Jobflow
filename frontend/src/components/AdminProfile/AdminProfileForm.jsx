@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, CheckCircle2, Shield, UserCheck, UserX, RefreshCw, Search, Users } from 'lucide-react';
+import Swal from 'sweetalert2';
 import '../CompanyProfile/CompanyProfileForm.css';
 import '../CandidateProfile/CandidateProfileForm.css';
 
@@ -88,10 +89,24 @@ export function AdminProfileForm({ onProfileUpdated }) {
         updateCurrentUserSession({ name: updated.name, phone: updated.phone });
       }
       setSavedSuccess(true);
+      Swal.fire({
+        icon: 'success',
+        title: 'Profil Admin enregistré',
+        text: 'Vos informations administrateur ont été mises à jour.',
+        timer: 2000,
+        showConfirmButton: false
+      });
       if (onProfileUpdated) onProfileUpdated();
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch (err) {
-      setErrorMsg(err.message || 'Erreur lors de la mise à jour du profil administrateur.');
+      const msg = err.message || 'Erreur lors de la mise à jour du profil administrateur.';
+      setErrorMsg(msg);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur',
+        text: msg,
+        confirmButtonColor: '#4f46e5'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -101,13 +116,32 @@ export function AdminProfileForm({ onProfileUpdated }) {
     try {
       if (user.accountStatus === 'ACTIVE') {
         await api.users.suspend(user.id);
+        Swal.fire({
+          icon: 'warning',
+          title: 'Compte suspendu',
+          text: `Le compte de ${user.name} (${user.email}) a été suspendu.`,
+          timer: 2000,
+          showConfirmButton: false
+        });
       } else {
         await api.users.activate(user.id);
+        Swal.fire({
+          icon: 'success',
+          title: 'Compte réactivé',
+          text: `Le compte de ${user.name} (${user.email}) est de nouveau actif.`,
+          timer: 2000,
+          showConfirmButton: false
+        });
       }
       await loadUsers();
       if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
-      alert(err.message || "Erreur lors du changement de statut de l'utilisateur.");
+      Swal.fire({
+        icon: 'error',
+        title: 'Action refusée',
+        text: err.message || "Erreur lors du changement de statut de l'utilisateur.",
+        confirmButtonColor: '#4f46e5'
+      });
     }
   };
 

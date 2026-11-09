@@ -9,6 +9,17 @@
 export const BASE_URL = '/api';
 const TOKEN_STORAGE_KEY = 'jobflow_jwt_token';
 
+const STATUS_MESSAGES_FR = {
+  400: 'Les informations saisies sont invalides. Veuillez vérifier vos champs.',
+  401: 'Identifiants incorrects ou session expirée. Veuillez vous reconnecter.',
+  403: "Accès refusé. Vous n'avez pas les droits nécessaires pour cette action.",
+  404: 'Aucun compte ou élément correspondant trouvé.',
+  409: 'Ce compte ou cet email existe déjà.',
+  500: 'Une erreur interne est survenue sur le serveur.',
+  502: 'Le serveur backend redémarre ou est inaccessible. Réessayez dans un instant.',
+  503: 'Service temporairement indisponible. Veuillez réessayer.'
+};
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
   const headers = {
@@ -17,20 +28,31 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers
+    });
+  } catch {
+    throw new Error(
+      'Impossible de contacter le serveur JobFlow. Vérifiez que le backend Spring Boot est bien démarré.'
+    );
+  }
 
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || (payload && payload.success === false)) {
+    const validationDetails =
+      payload?.data && typeof payload.data === 'object'
+        ? Object.values(payload.data).join(' • ')
+        : null;
+
     const errorMessage =
+      validationDetails ||
       payload?.message ||
-      (payload?.data && typeof payload.data === 'object'
-        ? Object.values(payload.data).join(', ')
-        : null) ||
-      `Erreur HTTP ${response.status}`;
+      STATUS_MESSAGES_FR[response.status] ||
+      'Une erreur est survenue lors du traitement de votre demande.';
     throw new Error(errorMessage);
   }
 
