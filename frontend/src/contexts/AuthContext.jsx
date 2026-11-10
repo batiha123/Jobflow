@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState } from 'react';
-import { db } from '../data/dbStore';
 import { api } from '../services/api';
 
 const AuthContext = createContext(null);

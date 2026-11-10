@@ -8,7 +8,7 @@ import { JobDetailModal } from '../components/JobDetailModal/JobDetailModal';
 import { useToast } from '../components/Toast/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
-import {
+import api, {
   getPublicCompanyProfiles,
   getPublishedJobOfferById,
   getPublishedJobOffers,
@@ -81,7 +81,7 @@ export function HomePage() {
     }
   };
 
-  const handleApplyClick = (offer) => {
+  const handleApplyClick = async (offer) => {
     if (!currentUser) {
       toast.error("Veuillez vous connecter avec votre compte candidat pour postuler.");
       return;
@@ -97,20 +97,34 @@ export function HomePage() {
     setApplyError(null);
     setMotivation('');
 
-    // TODO (Team): Connect to backend (e.g. GET /api/candidates/user/{id}) when ready
-    setCandidateProfile(db.getCandidateProfileByUser(currentUser));
+    try {
+      const prof = await api.candidates.getProfile(currentUser.id);
+      setCandidateProfile(prof || db.getCandidateProfileByUser(currentUser));
+    } catch {
+      setCandidateProfile(db.getCandidateProfileByUser(currentUser));
+    }
   };
 
-  const handleConfirmApply = (e) => {
+  const handleConfirmApply = async (e) => {
     e.preventDefault();
     if (!applyModalOffer || !currentUser) return;
 
     setIsApplying(true);
     setApplyError(null);
 
-    const cvUrlToUse = candidateProfile?.cv_url || 'https://jobflow.com/resumes/candidat_cv.pdf';
+    const cvUrlToUse = candidateProfile?.cvUrl || candidateProfile?.cv_url || 'https://jobflow.com/resumes/candidat_cv.pdf';
 
-    // TODO (Team): Connect to backend (e.g. POST /api/applications/apply) when ready
+    try {
+      await api.applications.apply({
+        candidateId: currentUser.id,
+        jobOfferId: applyModalOffer.id,
+        motivationMessage: motivation,
+        cvUrl: cvUrlToUse
+      });
+    } catch (err) {
+      console.warn("Échec soumission API candidature, synchronisation locale:", err);
+    }
+
     db.submitApplication({
       candidate: currentUser,
       candidate_id: currentUser.id,
@@ -249,20 +263,17 @@ export function HomePage() {
       {/* Call to action for candidates */}
       <section className="home-section-cta">
         <div className="container">
-          <div className="cta-card">
-            <div className="cta-content">
-              <h2>Prêt à accélérer votre carrière tech ?</h2>
-              <p>
-                Créez votre profil en 2 minutes, téléchargez votre CV et passez nos tests techniques pour vous démarquer auprès des meilleurs recruteurs.
-              </p>
-              <div className="cta-btn-group">
-                <Link to="/offres" className="btn-cta-primary">
-                  Explorer les offres d'emploi
-                </Link>
-                <Link to="/candidat/profil" className="btn-cta-secondary">
-                  Compléter mon profil & CV
-                </Link>
-              </div>
+          <div className="cta-card-box">
+            <h2>Prêt à accélérer votre carrière avec JobFlow ?</h2>
+            <p>Créez votre profil en quelques clics, téléversez votre CV et recevez des propositions d'entretiens qualifiées.</p>
+            <div className="cta-buttons-group">
+              <Link to="/offres" className="btn-register-pill" style={{ padding: '14px 32px', fontSize: '1rem' }}>
+                <span>Explorer les offres</span>
+                <ArrowRight size={18} />
+              </Link>
+              <Link to="/entreprises" className="btn-secondary" style={{ padding: '14px 28px', fontSize: '1rem', background: 'transparent', color: '#ffffff', borderColor: 'rgba(255,255,255,0.2)' }}>
+                <span>Découvrir les recruteurs</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -270,9 +281,9 @@ export function HomePage() {
 
       {/* Job Details Modal */}
       {selectedOfferForDetail && (
-        <JobDetailModal 
-          offer={selectedOfferForDetail} 
-          onClose={() => setSelectedOfferForDetail(null)} 
+        <JobDetailModal
+          offer={selectedOfferForDetail}
+          onClose={() => setSelectedOfferForDetail(null)}
           loading={detailLoading}
           error={detailError}
           onApply={(off) => {
@@ -282,7 +293,7 @@ export function HomePage() {
         />
       )}
 
-      {/* Quick Application Modal */}
+      {/* Application Modal */}
       {applyModalOffer && (
         <div className="modal-backdrop">
           <div className="job-offer-modal-card">
@@ -318,13 +329,13 @@ export function HomePage() {
 
                 <div className="form-group full-width">
                   <label className="form-label">
-                    <span>Message de motivation pour le recruteur</span>
+                    <span>Message de motivation au recruteur</span>
                   </label>
                   <textarea 
                     className="form-textarea"
                     required
                     rows={4}
-                    placeholder="Expliquez en quelques lignes pourquoi votre profil correspond parfaitement à cette opportunité..."
+                    placeholder="Expliquez pourquoi vous êtes le candidat idéal pour cette opportunité..."
                     value={motivation}
                     onChange={(e) => setMotivation(e.target.value)}
                   />
@@ -335,7 +346,7 @@ export function HomePage() {
                     <FileText size={16} style={{ color: 'var(--color-primary)' }} />
                     <span>Curriculum Vitae (CV)</span>
                   </div>
-                  {candidateProfile?.cv_url ? (
+                  {candidateProfile?.cv_url || candidateProfile?.cvUrl ? (
                     <div style={{ color: '#027a48', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} />
                       <span>{candidateProfile.cv_filename || "Mon_CV_Candidat.pdf"} (Votre CV enregistré sera automatiquement transmis)</span>

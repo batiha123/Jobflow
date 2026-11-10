@@ -6,7 +6,7 @@ import { JobDetailModal } from '../components/JobDetailModal/JobDetailModal';
 import { useToast } from '../components/Toast/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
-import { getPublishedJobOfferById, getPublishedJobOffers } from '../services/api';
+import api, { getPublishedJobOfferById, getPublishedJobOffers } from '../services/api';
 import { Search, MapPin, X, CheckCircle2, RotateCcw, FileText, AlertCircle, ArrowRight } from 'lucide-react';
 import './JobsPage.css';
 
@@ -60,8 +60,8 @@ export function JobsPage() {
     }, 250);
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
+      clearTimeout(timeoutId);
     };
   }, [keyword, location, contractFilter, page, reloadOffersKey]);
 
@@ -74,23 +74,21 @@ export function JobsPage() {
     setPage(0);
   };
 
-  const handleViewDetails = async offer => {
+  const handleViewDetails = async (offer) => {
     setSelectedOfferForDetail(offer);
     setDetailLoading(true);
     setDetailError('');
     try {
-      setSelectedOfferForDetail(await getPublishedJobOfferById(offer.id));
+      const detailed = await getPublishedJobOfferById(offer.id);
+      setSelectedOfferForDetail(detailed);
     } catch (requestError) {
-      if (requestError.name !== 'AbortError') {
-        setDetailError(requestError.message || 'Impossible de charger le détail de cette offre.');
-        toast.error(requestError.message || 'Impossible de charger le détail de cette offre.');
-      }
+      setDetailError(requestError.message || "Impossible de charger le détail complet de l'offre.");
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const handleOpenApply = (offer) => {
+  const handleOpenApply = async (offer) => {
     if (!currentUser) {
       toast.error("Veuillez vous connecter avec votre compte candidat pour postuler.");
       return;
@@ -106,20 +104,34 @@ export function JobsPage() {
     setApplyError(null);
     setMotivation('');
 
-    // TODO (Team): Connect to backend (e.g. GET /api/candidates/user/{id}) when ready
-    setCandidateProfile(db.getCandidateProfileByUser(currentUser));
+    try {
+      const prof = await api.candidates.getProfile(currentUser.id);
+      setCandidateProfile(prof || db.getCandidateProfileByUser(currentUser));
+    } catch {
+      setCandidateProfile(db.getCandidateProfileByUser(currentUser));
+    }
   };
 
-  const handleConfirmApply = (e) => {
+  const handleConfirmApply = async (e) => {
     e.preventDefault();
     if (!applyModalOffer || !currentUser) return;
 
     setIsApplying(true);
     setApplyError(null);
 
-    const cvUrlToUse = candidateProfile?.cv_url || 'https://jobflow.com/resumes/candidat_cv.pdf';
+    const cvUrlToUse = candidateProfile?.cvUrl || candidateProfile?.cv_url || 'https://jobflow.com/resumes/candidat_cv.pdf';
 
-    // TODO (Team): Connect to backend (e.g. POST /api/applications/apply) when ready
+    try {
+      await api.applications.apply({
+        candidateId: currentUser.id,
+        jobOfferId: applyModalOffer.id,
+        motivationMessage: motivation,
+        cvUrl: cvUrlToUse
+      });
+    } catch (err) {
+      console.warn("Échec soumission API candidature, synchronisation locale:", err);
+    }
+
     db.submitApplication({
       candidate: currentUser,
       candidate_id: currentUser.id,
@@ -378,7 +390,7 @@ export function JobsPage() {
                     <FileText size={16} style={{ color: 'var(--color-primary)' }} />
                     <span>Curriculum Vitae (CV)</span>
                   </div>
-                  {candidateProfile?.cv_url ? (
+                  {candidateProfile?.cv_url || candidateProfile?.cvUrl ? (
                     <div style={{ color: '#027a48', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} />
                       <span>{candidateProfile.cv_filename || "Mon_CV_Candidat.pdf"} (Votre CV enregistré sera automatiquement transmis)</span>

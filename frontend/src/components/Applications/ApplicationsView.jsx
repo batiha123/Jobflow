@@ -50,10 +50,16 @@ export function ApplicationsView({ onStatusChange }) {
     setIsLoading(true);
     try {
       if (isCompany) {
-        setApplications(db.getApplicationsForCompany(currentUser));
+        // Fetch all applications for recruiter
+        const liveApps = await api.applications.getAll();
+        if (Array.isArray(liveApps) && liveApps.length > 0) {
+          setApplications(liveApps);
+        } else {
+          setApplications(db.getApplicationsForCompany(currentUser));
+        }
       } else {
         // Fetch from real MySQL backend via REST API
-        const liveApps = await api.applications.getCandidateApplications(currentUser.id, currentUser);
+        const liveApps = await api.applications.getCandidateApplications(currentUser.id);
         if (Array.isArray(liveApps) && liveApps.length > 0) {
           setApplications(liveApps);
         } else {
@@ -63,7 +69,11 @@ export function ApplicationsView({ onStatusChange }) {
       }
     } catch (err) {
       console.warn("Connexion API candidatures échouée, fallback local:", err);
-      setApplications(db.getApplicationsForCandidate(currentUser));
+      if (isCompany) {
+        setApplications(db.getApplicationsForCompany(currentUser));
+      } else {
+        setApplications(db.getApplicationsForCandidate(currentUser));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +83,12 @@ export function ApplicationsView({ onStatusChange }) {
     loadData();
   }, [currentUser]);
 
-  const handleUpdateStatus = (appId, newStatus) => {
+  const handleUpdateStatus = async (appId, newStatus) => {
+    try {
+      await api.applications.updateStatus(appId, newStatus);
+    } catch (err) {
+      console.warn("Échec mise à jour statut via API:", err);
+    }
     db.updateApplicationStatus(appId, newStatus);
     loadData();
     if (onStatusChange) onStatusChange();
@@ -85,7 +100,7 @@ export function ApplicationsView({ onStatusChange }) {
     }
 
     try {
-      await api.applications.withdraw(appId, currentUser.id);
+      await api.applications.withdraw(appId);
     } catch (err) {
       console.warn("Échec du retrait backend, synchronisation locale:", err);
     }
@@ -95,9 +110,22 @@ export function ApplicationsView({ onStatusChange }) {
     if (onStatusChange) onStatusChange();
   };
 
-  const handleScheduleSubmit = (e) => {
+  const handleScheduleSubmit = async (e) => {
     e.preventDefault();
     if (!scheduleModalApp) return;
+
+    try {
+      await api.interviews.schedule({
+        applicationId: scheduleModalApp.id,
+        scheduledAt: interviewDate,
+        location: 'Google Meet',
+        meetingUrl: meetingUrl,
+        notes: 'Entretien RH et technique d’une durée de 45 minutes.'
+      });
+      await api.applications.updateStatus(scheduleModalApp.id, 'SHORTLISTED');
+    } catch (err) {
+      console.warn("Échec de la planification via API:", err);
+    }
 
     db.scheduleInterview({
       application_id: scheduleModalApp.id,
@@ -123,7 +151,17 @@ export function ApplicationsView({ onStatusChange }) {
     });
   };
 
-  const handleTestCompleted = (result) => {
+  const handleTestCompleted = async (result) => {
+    try {
+      await api.tests.submit({
+        testId: result.testId || 1,
+        applicationId: result.applicationId,
+        score: result.score
+      });
+    } catch (err) {
+      console.warn("Échec de la soumission du test via API:", err);
+    }
+
     // Update local applications state with score
     setApplications((prev) =>
       prev.map((a) => {

@@ -126,14 +126,23 @@ export function DashboardPage() {
     if (!currentUser) return;
 
     if (currentRole === 'COMPANY') {
-      const apps = db.getApplicationsForCompany(currentUser);
-      setMyApplications(apps);
+      try {
+        const apps = await api.applications.getAll();
+        setMyApplications(Array.isArray(apps) && apps.length > 0 ? apps : db.getApplicationsForCompany(currentUser));
+      } catch {
+        setMyApplications(db.getApplicationsForCompany(currentUser));
+      }
       await loadCompanyOffers();
     } else if (currentRole === 'CANDIDATE') {
-      const apps = db.getApplicationsForCandidate(currentUser);
-      const prof = db.getCandidateProfileByUser(currentUser);
-      setMyApplications(apps);
-      setCandidateProfile(prof);
+      try {
+        const apps = await api.applications.getCandidateApplications(currentUser.id);
+        const prof = await api.candidates.getProfile(currentUser.id);
+        setMyApplications(Array.isArray(apps) && apps.length > 0 ? apps : db.getApplicationsForCandidate(currentUser));
+        setCandidateProfile(prof || db.getCandidateProfileByUser(currentUser));
+      } catch {
+        setMyApplications(db.getApplicationsForCandidate(currentUser));
+        setCandidateProfile(db.getCandidateProfileByUser(currentUser));
+      }
     } else if (currentRole === 'ADMIN') {
       try {
         const stats = await api.admin.getStats();

@@ -371,53 +371,132 @@ export const api = {
 
   // 4. Applications (/api/applications) — Person 3
   applications: {
-    /**
-     * POST /api/applications/apply
-     */
-    apply: async ({ userId, jobOfferId, motivationMessage, cvUrl }) => {
-      console.log('[API] applications.apply placeholder with:', { userId, jobOfferId, motivationMessage, cvUrl });
-      return { id: Date.now(), userId, jobOfferId, status: 'SUBMITTED' };
+    apply: async ({ candidateId, userId, jobOfferId, motivationMessage, cvUrl }) => {
+      return request('/applications/apply', {
+        method: 'POST',
+        body: JSON.stringify({
+          candidateId: candidateId || userId,
+          jobOfferId,
+          motivationMessage,
+          cvUrl
+        })
+      });
     },
 
-    /**
-     * GET /api/applications/candidate/{userId}
-     */
-    getCandidateApplications: async (userId) => {
-      console.log('[API] applications.getCandidateApplications placeholder for userId:', userId);
-      return [];
+    getCandidateApplications: async (candidateId) => {
+      const apps = await request(`/applications/candidate/${candidateId}`).catch(() => []);
+      if (!Array.isArray(apps)) return [];
+      try {
+        const jobsData = await api.jobs.getAll({ size: 100 });
+        const jobs = Array.isArray(jobsData) ? jobsData : jobsData?.content || [];
+        const jobMap = new Map(jobs.map(j => [j.id, j]));
+        return apps.map(app => {
+          const job = jobMap.get(app.jobOfferId);
+          return {
+            ...app,
+            jobTitle: job?.title || `Offre #${app.jobOfferId}`,
+            companyName: job?.companyName || 'Entreprise partenaire',
+            location: job?.location || ''
+          };
+        });
+      } catch {
+        return apps;
+      }
     },
 
-    /**
-     * PUT /api/applications/{id}/withdraw?userId={userId}
-     */
-    withdraw: async (applicationId, userId) => {
-      console.log('[API] applications.withdraw placeholder for appId:', applicationId, userId);
-      return { id: applicationId, status: 'WITHDRAWN' };
+    getJobApplications: async (jobOfferId) => {
+      return request(`/applications/job/${jobOfferId}`);
+    },
+
+    getAll: async () => {
+      const apps = await request('/applications').catch(() => []);
+      if (!Array.isArray(apps)) return [];
+      try {
+        const jobsData = await api.jobs.getAll({ size: 100 });
+        const jobs = Array.isArray(jobsData) ? jobsData : jobsData?.content || [];
+        const jobMap = new Map(jobs.map(j => [j.id, j]));
+        return apps.map(app => {
+          const job = jobMap.get(app.jobOfferId);
+          return {
+            ...app,
+            jobTitle: job?.title || `Offre #${app.jobOfferId}`,
+            companyName: job?.companyName || 'Entreprise partenaire'
+          };
+        });
+      } catch {
+        return apps;
+      }
+    },
+
+    updateStatus: async (applicationId, status) => {
+      return request(`/applications/${applicationId}/status?status=${status}`, {
+        method: 'PATCH'
+      });
+    },
+
+    withdraw: async (applicationId) => {
+      return request(`/applications/${applicationId}/withdraw`, {
+        method: 'PUT'
+      });
+    },
+
+    uploadCv: async (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+      const res = await fetch(`${BASE_URL}/applications/upload-cv`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      return data?.data?.cvUrl || data?.cvUrl;
+    }
+  },
+
+  // 4b. Interviews (/api/interviews) — Person 3
+  interviews: {
+    schedule: async ({ applicationId, scheduledAt, location, meetingUrl, notes }) => {
+      return request('/interviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          applicationId,
+          scheduledAt,
+          location: location || 'Google Meet',
+          meetingUrl: meetingUrl || 'https://meet.google.com/jobflow-interview',
+          notes: notes || 'Entretien programmé'
+        })
+      });
+    },
+    getByApplication: async (applicationId) => {
+      return request(`/interviews/application/${applicationId}`);
+    },
+    updateStatus: async (id, status) => {
+      return request(`/interviews/${id}/status?status=${status}`, {
+        method: 'PATCH'
+      });
     }
   },
 
   // 5. Technical Assessment Tests (/api/tests) — Person 3
   tests: {
-    /**
-     * GET /api/tests
-     */
     getAll: async () => {
-      return [];
+      return request('/tests');
     },
 
-    /**
-     * GET /api/tests/job/{jobOfferId}
-     */
     getForJob: async (jobOfferId) => {
-      return [];
+      return request(`/tests/job/${jobOfferId}`);
     },
 
-    /**
-     * POST /api/tests/submit
-     */
     submit: async ({ testId, applicationId, score }) => {
-      console.log('[API] tests.submit placeholder with:', { testId, applicationId, score });
-      return { id: Date.now(), testId, applicationId, score, status: 'COMPLETED' };
+      return request('/tests/submit', {
+        method: 'POST',
+        body: JSON.stringify({ testId, applicationId, score, status: 'COMPLETED' })
+      });
+    },
+
+    getAttemptsForApplication: async (applicationId) => {
+      return request(`/test-attempts/application/${applicationId}`);
     }
   },
 
