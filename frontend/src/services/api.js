@@ -167,6 +167,149 @@ export const api = {
       // TODO: Connect to POST /api/tests/submit
       return { id: Date.now(), testId, applicationId, score, status: 'COMPLETED' };
     }
+  },
+
+  // 6. Notifications (/api/notifications) — Person 4
+  notifications: {
+    getUserNotifications: async (userId) => {
+      try {
+        const res = await fetch(`${BASE_URL}/notifications/user/${userId}`);
+        const json = await res.json();
+        return json.data || [];
+      } catch (err) {
+        console.error('[API] Failed to fetch notifications:', err);
+        return [];
+      }
+    },
+    getUnreadCount: async (userId) => {
+      try {
+        const res = await fetch(`${BASE_URL}/notifications/user/${userId}/unread-count`);
+        const json = await res.json();
+        return json.data || 0;
+      } catch (err) {
+        console.error('[API] Failed to fetch unread count:', err);
+        return 0;
+      }
+    },
+    markAsRead: async (id) => {
+      try {
+        const res = await fetch(`${BASE_URL}/notifications/${id}/read`, { method: 'PATCH' });
+        return await res.json();
+      } catch (err) {
+        console.error('[API] Failed to mark notification as read:', err);
+        return null;
+      }
+    },
+    create: async (userId, message) => {
+      try {
+        const res = await fetch(`${BASE_URL}/notifications?userId=${userId}&message=${encodeURIComponent(message)}`, {
+          method: 'POST'
+        });
+        return await res.json();
+      } catch (err) {
+        console.error('[API] Failed to create notification:', err);
+        return null;
+      }
+    }
+  },
+
+  // 7. Job Offer Reports (/api/reports) — Person 4
+  reports: {
+    create: async ({ userId, jobOfferId, reason, description }) => {
+      try {
+        const res = await fetch(`${BASE_URL}/reports?userId=${userId}&jobOfferId=${jobOfferId}&reason=${encodeURIComponent(reason)}&description=${encodeURIComponent(description || '')}`, {
+          method: 'POST'
+        });
+        return await res.json();
+      } catch (err) {
+        console.error('[API] Failed to submit report:', err);
+        return null;
+      }
+    },
+    getAll: async (status = '') => {
+      try {
+        const url = status ? `${BASE_URL}/reports?status=${status}` : `${BASE_URL}/reports`;
+        const res = await fetch(url);
+        const json = await res.json();
+        return json.data || [];
+      } catch (err) {
+        console.error('[API] Failed to fetch reports:', err);
+        return [];
+      }
+    },
+    updateStatus: async (reportId, status) => {
+      try {
+        const res = await fetch(`${BASE_URL}/reports/${reportId}/status?status=${status}`, {
+          method: 'PATCH'
+        });
+        return await res.json();
+      } catch (err) {
+        console.error('[API] Failed to update report status:', err);
+        return null;
+      }
+    },
+    getPendingCount: async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/reports/pending-count`);
+        const json = await res.json();
+        return json.data || 0;
+      } catch (err) {
+        console.error('[API] Failed to fetch pending report count:', err);
+        return 0;
+      }
+    }
+  },
+
+  // 8. Admin Platform Stats & Audit (/api/admin) — Person 4
+  admin: {
+    getStats: async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/admin/stats`);
+        const json = await res.json();
+        return json.data || { totalUsers: 0, activeJobOffers: 0, totalApplications: 0, pendingReports: 0 };
+      } catch (err) {
+        console.error('[API] Failed to fetch admin stats:', err);
+        return { totalUsers: 0, activeJobOffers: 0, totalApplications: 0, pendingReports: 0 };
+      }
+    },
+    getAuditLogs: async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/admin/audit-logs`);
+        const json = await res.json();
+        return json.data || [];
+      } catch (err) {
+        console.error('[API] Failed to fetch audit logs:', err);
+        return [];
+      }
+    },
+    logAction: async ({ adminUserId, action, targetType, targetId, details }) => {
+      try {
+        const url = `${BASE_URL}/admin/audit-logs?adminUserId=${adminUserId}&action=${encodeURIComponent(action)}&targetType=${encodeURIComponent(targetType)}&targetId=${targetId || ''}&details=${encodeURIComponent(details || '')}`;
+        const res = await fetch(url, { method: 'POST' });
+        return await res.json();
+      } catch (err) {
+        console.error('[API] Failed to log admin action:', err);
+        return null;
+      }
+    }
+  },
+
+  // 9. Google Gemini AI Analysis (/api/ai) — Person 4
+  ai: {
+    analyzeCv: async (candidateSkills, jobRequirements) => {
+      try {
+        const res = await fetch(`${BASE_URL}/ai/analyze-cv`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidateSkills, jobRequirements })
+        });
+        const json = await res.json();
+        return json.data;
+      } catch (err) {
+        console.error('[API] Failed to run AI CV analysis:', err);
+        return null;
+      }
+    }
   }
 };
 
