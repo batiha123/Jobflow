@@ -9,6 +9,7 @@ import { ApplicationsView } from '../components/Applications/ApplicationsView';
 import { AuthModal } from '../components/AuthModal/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
+import api from '../services/api';
 import { 
   Briefcase, 
   Users, 
@@ -19,7 +20,14 @@ import {
   Edit3, 
   LogIn,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Sparkles,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Activity,
+  Send
 } from 'lucide-react';
 
 export function DashboardPage() {
@@ -35,9 +43,25 @@ export function DashboardPage() {
   const [myOffers, setMyOffers] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
   const [candidateProfile, setCandidateProfile] = useState(null);
-  const [globalStats, setGlobalStats] = useState({ users: 0, offers: 0, companies: 0 });
+  
+  // Person 4: Admin Live Backend Data
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    activeJobOffers: 0,
+    totalApplications: 0,
+    pendingReports: 0
+  });
+  const [reports, setReports] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [filterReportStatus, setFilterReportStatus] = useState('');
 
-  const refreshData = () => {
+  // Person 4: Google Gemini AI State
+  const [aiCandidateSkills, setAiCandidateSkills] = useState('Java 21, Spring Boot, MySQL, REST APIs, Git, Docker');
+  const [aiJobRequirements, setAiJobRequirements] = useState('Ingénieur Backend Java: 2+ ans avec Java, Spring Boot, architecture microservices, bases de données relationnelles, CI/CD, Kubernetes');
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const refreshData = async () => {
     if (!currentUser) return;
     
     if (currentRole === 'COMPANY') {
@@ -51,17 +75,55 @@ export function DashboardPage() {
       setMyApplications(apps);
       setCandidateProfile(prof);
     } else if (currentRole === 'ADMIN') {
-      setGlobalStats({
-        users: db.getUsers().length,
-        offers: db.getJobOffers().length,
-        companies: db.getCompanyProfiles().length
-      });
+      // Fetch live statistics from Spring Boot Backend
+      try {
+        const stats = await api.admin.getStats();
+        setAdminStats(stats);
+        const liveReports = await api.reports.getAll();
+        setReports(liveReports);
+        const liveLogs = await api.admin.getAuditLogs();
+        setAuditLogs(liveLogs);
+      } catch (err) {
+        console.error('Failed to load admin data:', err);
+      }
     }
   };
 
   useEffect(() => {
     refreshData();
   }, [currentUser, currentRole]);
+
+  // Moderation: Update report status
+  const handleUpdateReportStatus = async (reportId, newStatus) => {
+    await api.reports.updateStatus(reportId, newStatus);
+    setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: newStatus } : r));
+    // Log admin action
+    if (currentUser?.id) {
+      await api.admin.logAction({
+        adminUserId: currentUser.id,
+        action: `REPORT_${newStatus}`,
+        targetType: 'JOB_OFFER_REPORT',
+        targetId: reportId,
+        details: `Statut du rapport #${reportId} changé vers ${newStatus}`
+      });
+      const liveLogs = await api.admin.getAuditLogs();
+      setAuditLogs(liveLogs);
+    }
+  };
+
+  // Run AI Analysis via Google Gemini
+  const handleRunAiAnalysis = async (e) => {
+    e.preventDefault();
+    setAiLoading(true);
+    try {
+      const result = await api.ai.analyzeCv(aiCandidateSkills, aiJobRequirements);
+      setAiResult(result);
+    } catch (err) {
+      console.error('AI Analysis failed:', err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const computeProfileCompleteness = (prof) => {
     if (!prof) return 30;
@@ -134,6 +196,10 @@ export function DashboardPage() {
   const companyInterviewsCount = myApplications.filter(a => a.interview && a.interview.scheduled_at).length;
   const candidateCompleteness = computeProfileCompleteness(candidateProfile);
 
+  const filteredReports = filterReportStatus 
+    ? reports.filter(r => r.status === filterReportStatus)
+    : reports;
+
   return (
     <div>
       <Navbar />
@@ -154,12 +220,12 @@ export function DashboardPage() {
                 <h1>
                   {currentRole === 'COMPANY' && `Espace Recruteur — ${currentUser.companyName || currentUser.name}`}
                   {currentRole === 'CANDIDATE' && `Bienvenue, ${currentUser.name} 👋`}
-                  {currentRole === 'ADMIN' && "Espace Administration"}
+                  {currentRole === 'ADMIN' && "Espace Administration & Supervision"}
                 </h1>
                 <p>
                   {currentRole === 'COMPANY' && "Gérez vos recrutements, vos annonces actives et consultez les candidatures reçues."}
                   {currentRole === 'CANDIDATE' && "Suivez vos candidatures en direct, préparez vos entretiens et mettez à jour votre CV."}
-                  {currentRole === 'ADMIN' && "Contrôle global de la plateforme, gestion des utilisateurs et modération des annonces."}
+                  {currentRole === 'ADMIN' && "Métriques en direct, journal des audits de sécurité et supervision globale."}
                 </p>
               </div>
 
@@ -200,11 +266,11 @@ export function DashboardPage() {
               {currentRole === 'CANDIDATE' && (
                 <>
                   <div className="metric-card">
-                    <span className="metric-card-title">Mes Candidatures</span>
+                    <span className="metric-card-title">Candidatures envoyées</span>
                     <span className="metric-card-val">{myApplications.length}</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-card-title">Entretiens prévus</span>
+                    <span className="metric-card-title">Entretiens confirmés</span>
                     <span className="metric-card-val">{candidateInterviewsCount}</span>
                   </div>
                   <div className="metric-card">
@@ -216,23 +282,84 @@ export function DashboardPage() {
                 </>
               )}
 
+              {/* Real Live Spring Boot Metrics for Admin (Person 4) */}
               {currentRole === 'ADMIN' && (
                 <>
                   <div className="metric-card">
                     <span className="metric-card-title">Utilisateurs inscrits</span>
-                    <span className="metric-card-val">{globalStats.users}</span>
+                    <span className="metric-card-val">{adminStats.totalUsers}</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-card-title">Total Offres d'emploi</span>
-                    <span className="metric-card-val">{globalStats.offers}</span>
+                    <span className="metric-card-title">Offres actives</span>
+                    <span className="metric-card-val">{adminStats.activeJobOffers}</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-card-title">Total Entreprises</span>
-                    <span className="metric-card-val">{globalStats.companies}</span>
+                    <span className="metric-card-title">Candidatures totales</span>
+                    <span className="metric-card-val">{adminStats.totalApplications}</span>
+                  </div>
+                  <div className="metric-card" style={{ borderColor: adminStats.pendingReports > 0 ? '#fca5a5' : undefined }}>
+                    <span className="metric-card-title">Signalements en attente</span>
+                    <span className="metric-card-val" style={{ color: adminStats.pendingReports > 0 ? '#dc2626' : undefined }}>
+                      {adminStats.pendingReports}
+                    </span>
                   </div>
                 </>
               )}
             </div>
+
+            {/* Admin Audit Trail Table (Person 4) */}
+            {currentRole === 'ADMIN' && (
+              <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)', marginTop: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Activity size={20} style={{ color: 'var(--color-primary)' }} />
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
+                      Journal des Actions d'Administration (Audit Logs)
+                    </h3>
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    {auditLogs.length} action{auditLogs.length > 1 ? 's' : ''} enregistrée{auditLogs.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                {auditLogs.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                    Aucun log d'action pour le moment. Les actions d'administration seront tracées ici automatiquement.
+                  </p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                          <th style={{ padding: '10px' }}>Date</th>
+                          <th style={{ padding: '10px' }}>Admin ID</th>
+                          <th style={{ padding: '10px' }}>Action</th>
+                          <th style={{ padding: '10px' }}>Cible</th>
+                          <th style={{ padding: '10px' }}>Détails</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogs.map((log) => (
+                          <tr key={log.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                            <td style={{ padding: '10px', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+                              {log.createdAt ? new Date(log.createdAt).toLocaleString('fr-FR') : 'N/A'}
+                            </td>
+                            <td style={{ padding: '10px', fontWeight: 600 }}>#{log.adminUserId}</td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                                {log.action}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px' }}>{log.targetType} #{log.targetId}</td>
+                            <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{log.details}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Content for Company */}
             {currentRole === 'COMPANY' && (
@@ -248,40 +375,37 @@ export function DashboardPage() {
                       onClick={() => setActiveTab('offers')}
                       style={{ fontSize: '0.84rem' }}
                     >
-                      Gérer toutes les offres →
+                      Voir toutes les offres ({myOffers.length})
                     </button>
                   )}
                 </div>
-                
+
                 {myOffers.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '36px 20px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px dashed var(--border-default)' }}>
-                    <Briefcase size={36} style={{ color: 'var(--color-primary)', opacity: 0.5, marginBottom: '8px' }} />
-                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Vous n'avez pas encore publié d'offre</h4>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.88rem', marginTop: '4px', marginBottom: '16px' }}>
-                      Créez votre première annonce pour commencer à attirer des candidats qualifiés.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn-register-pill"
-                      onClick={() => {
-                        setEditingOffer(null);
-                        setIsOfferModalOpen(true);
-                      }}
-                    >
-                      <Plus size={16} />
-                      <span>Publier ma première offre</span>
-                    </button>
-                  </div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    Vous n'avez pas encore publié d'offre. Cliquez sur "Publier une offre" pour créer votre première annonce.
+                  </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {myOffers.map(offer => (
-                      <div key={offer.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+                    {myOffers.slice(0, 3).map((offer) => (
+                      <div
+                        key={offer.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          borderRadius: '12px',
+                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--bg-page)'
+                        }}
+                      >
                         <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{offer.title}</div>
-                          <div style={{ fontSize: '0.84rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-                            {offer.location} · {offer.contract_type} · Statut : <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{offer.status}</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{offer.title}</strong>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            {offer.location} · {offer.contract_type} · Publiée le {new Date(offer.created_at).toLocaleDateString()}
                           </div>
                         </div>
+
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
                             type="button"
@@ -363,16 +487,15 @@ export function DashboardPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Créer une annonce</span>
+                <span>Publier une offre</span>
               </button>
             </div>
 
             {myOffers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
-                <Briefcase size={44} style={{ color: 'var(--color-primary)', opacity: 0.5, marginBottom: '12px' }} />
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Aucune offre publiée pour le moment</h3>
-                <p style={{ color: 'var(--text-tertiary)', marginTop: '4px', marginBottom: '20px' }}>
-                  Publiez votre première offre d'emploi pour commencer à recevoir des candidatures.
+              <div style={{ background: 'var(--bg-surface)', padding: '40px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-default)' }}>
+                <h3>Aucune offre publiée</h3>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                  Commencez dès maintenant à recruter les meilleurs talents en publiant votre première offre.
                 </p>
                 <button
                   type="button"
@@ -383,20 +506,42 @@ export function DashboardPage() {
                   }}
                 >
                   <Plus size={16} />
-                  <span>Créer une annonce d'emploi</span>
+                  <span>Publier une annonce</span>
                 </button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {myOffers.map(offer => (
-                  <div key={offer.id} style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {myOffers.map((offer) => (
+                  <div
+                    key={offer.id}
+                    style={{
+                      background: 'var(--bg-surface)',
+                      padding: '24px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border-default)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
                     <div>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{offer.title}</h3>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                        {offer.location} · {offer.contract_type} · Salaire: {offer.salary_min}€ - {offer.salary_max}€
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>{offer.title}</h3>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
+                          ACTIVE
+                        </span>
+                      </div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '6px 0 12px 0', maxWidth: '650px' }}>
+                        {offer.description.substring(0, 160)}...
+                      </p>
+                      <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                        <span>📍 {offer.location}</span>
+                        <span>📄 {offer.contract_type}</span>
+                        <span>💶 {offer.salary ? `${offer.salary} €` : 'Salaire non spécifié'}</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
                       <button
                         type="button"
                         className="btn-secondary"
@@ -405,7 +550,7 @@ export function DashboardPage() {
                           setIsOfferModalOpen(true);
                         }}
                       >
-                        <Edit3 size={14} />
+                        <Edit3 size={15} />
                         <span>Modifier</span>
                       </button>
                       <button
@@ -414,7 +559,7 @@ export function DashboardPage() {
                         style={{ color: 'var(--color-danger)' }}
                         onClick={() => handleDeleteOffer(offer.id)}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                         <span>Supprimer</span>
                       </button>
                     </div>
@@ -438,25 +583,291 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 5: MODERATION (Admin) */}
+        {/* TAB 5: MODERATION (Person 4 — Real Backend Reports) */}
         {activeTab === 'moderation' && (
           <div>
             <div className="dashboard-page-header">
               <div>
-                <h1>Modération des Annonces</h1>
-                <p>Signalements déposés par les utilisateurs nécessitant un examen.</p>
+                <h1>Modération & Gestion des Signalements</h1>
+                <p>Examinez les signalements déposés par les utilisateurs en temps réel via l'API Spring Boot.</p>
+              </div>
+
+              {/* Status Filter buttons */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className={`btn-secondary ${filterReportStatus === '' ? 'active' : ''}`}
+                  onClick={() => setFilterReportStatus('')}
+                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                >
+                  Tous ({reports.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn-secondary ${filterReportStatus === 'PENDING' ? 'active' : ''}`}
+                  onClick={() => setFilterReportStatus('PENDING')}
+                  style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#b45309' }}
+                >
+                  En attente ({reports.filter(r => r.status === 'PENDING').length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn-secondary ${filterReportStatus === 'REVIEWED' ? 'active' : ''}`}
+                  onClick={() => setFilterReportStatus('REVIEWED')}
+                  style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#15803d' }}
+                >
+                  Examinés ({reports.filter(r => r.status === 'REVIEWED').length})
+                </button>
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--color-warning-bg)', borderRadius: '10px', border: '1px solid #fedf89' }}>
-                <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
-                <div>
-                  <strong>Signalement sur l'offre #3 (Ingénieur Logiciel Fullstack)</strong>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Motif : Information de salaire à préciser · Statut : En cours d'examen
+            {filteredReports.length === 0 ? (
+              <div style={{ background: 'var(--bg-surface)', padding: '40px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-default)' }}>
+                <ShieldCheck size={36} style={{ color: '#16a34a', margin: '0 auto 12px auto' }} />
+                <h3>Aucun signalement trouvé</h3>
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  La plateforme est saine. Aucun rapport ne correspond au filtre sélectionné.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {filteredReports.map((report) => (
+                  <div
+                    key={report.id}
+                    style={{
+                      background: 'var(--bg-surface)',
+                      padding: '20px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border-default)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                        <span style={{
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: report.status === 'PENDING' ? '#fef3c7' : (report.status === 'REVIEWED' ? '#dcfce7' : '#f1f5f9'),
+                          color: report.status === 'PENDING' ? '#b45309' : (report.status === 'REVIEWED' ? '#15803d' : '#64748b')
+                        }}>
+                          {report.status}
+                        </span>
+                        <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                          Signalement #{report.id} sur l'Offre #{report.jobOfferId}
+                        </strong>
+                      </div>
+
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 600, color: '#334155' }}>
+                        Motif : {report.reason}
+                      </p>
+                      {report.description && (
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#64748b' }}>
+                          Détails : {report.description}
+                        </p>
+                      )}
+
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Signalé par utilisateur #{report.userId} · Date : {report.reportDate ? new Date(report.reportDate).toLocaleString('fr-FR') : 'N/A'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      {report.status !== 'REVIEWED' && (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#16a34a' }}
+                          onClick={() => handleUpdateReportStatus(report.id, 'REVIEWED')}
+                        >
+                          <CheckCircle size={14} />
+                          <span>Valider / Traiter</span>
+                        </button>
+                      )}
+                      {report.status !== 'DISMISSED' && (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#64748b' }}
+                          onClick={() => handleUpdateReportStatus(report.id, 'DISMISSED')}
+                        >
+                          <XCircle size={14} />
+                          <span>Ignorer</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 6: GOOGLE GEMINI AI MATCHER (Person 4) */}
+        {activeTab === 'ai-matcher' && (
+          <div>
+            <div className="dashboard-page-header">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={24} style={{ color: '#8b5cf6' }} />
+                  <h1 style={{ margin: 0 }}>Analyseur de CV par IA (Google Gemini 1.5 Flash)</h1>
                 </div>
+                <p>
+                  Testez en direct l'intégration de l'IA Google Gemini pour calculer l'adéquation candidat / offre d'emploi.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Form Input */}
+              <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px' }}>
+                  Données d'évaluation
+                </h3>
+
+                <form onSubmit={handleRunAiAnalysis}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                      Compétences & Profil du Candidat :
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={aiCandidateSkills}
+                      onChange={(e) => setAiCandidateSkills(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-default)',
+                        fontSize: '0.88rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                      Exigences & Compétences requises par l'offre :
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={aiJobRequirements}
+                      onChange={(e) => setAiJobRequirements(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-default)',
+                        fontSize: '0.88rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={aiLoading}
+                    className="btn-register-pill"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      padding: '12px',
+                      cursor: aiLoading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    <span>{aiLoading ? "Analyse en cours avec Gemini..." : "Lancer l'analyse avec Google Gemini"}</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* AI Result Card */}
+              <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px' }}>
+                  Résultat de l'analyse IA
+                </h3>
+
+                {aiLoading ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6366f1' }}>
+                    <Sparkles size={40} className="animate-spin" style={{ animation: 'spin 2s linear infinite', marginBottom: '12px' }} />
+                    <p style={{ fontWeight: 600 }}>Google Gemini examine les compétences...</p>
+                  </div>
+                ) : aiResult ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Score header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Score de correspondance</span>
+                        <div style={{ fontSize: '2rem', fontWeight: 900, color: aiResult.matchScore >= 70 ? '#16a34a' : (aiResult.matchScore >= 50 ? '#d97706' : '#dc2626') }}>
+                          {aiResult.matchScore}%
+                        </div>
+                      </div>
+                      <span style={{
+                        padding: '6px 14px',
+                        borderRadius: '9999px',
+                        fontSize: '0.85rem',
+                        fontWeight: 800,
+                        background: aiResult.matchLevel === 'STRONG' ? '#dcfce7' : (aiResult.matchLevel === 'MODERATE' ? '#fef3c7' : '#fee2e2'),
+                        color: aiResult.matchLevel === 'STRONG' ? '#15803d' : (aiResult.matchLevel === 'MODERATE' ? '#b45309' : '#b91c1c')
+                      }}>
+                        {aiResult.matchLevel} MATCH
+                      </span>
+                    </div>
+
+                    {/* Matched skills */}
+                    <div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15803d', display: 'block', marginBottom: '6px' }}>
+                        ✓ Compétences validées :
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {aiResult.matchedSkills?.map((s, idx) => (
+                          <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: '#dcfce7', color: '#15803d' }}>
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Missing skills */}
+                    <div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '6px' }}>
+                        ✗ Compétences à approfondir :
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {aiResult.missingSkills && aiResult.missingSkills.length > 0 ? (
+                          aiResult.missingSkills.map((s, idx) => (
+                            <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: '#fee2e2', color: '#b91c1c' }}>
+                              {s}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Aucune compétence manquante détectée.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div style={{ marginTop: 'auto', padding: '12px 14px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155', fontStyle: 'italic' }}>
+                      "{aiResult.summary}"
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.9rem', textAlign: 'center', padding: '40px' }}>
+                    Cliquez sur "Lancer l'analyse avec Google Gemini" pour voir le score et l'analyse détaillée en direct.
+                  </div>
+                )}
               </div>
             </div>
           </div>

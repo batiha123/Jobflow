@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   ArrowLeft,
   Plus,
-  LogOut
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import './DashboardLayout.css';
@@ -36,8 +37,9 @@ export function DashboardLayout({
       { id: 'applications', label: 'Mes Candidatures', icon: FileCheck2 },
     ],
     ADMIN: [
-      { id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },
-      { id: 'moderation', label: 'Modération & Rapports', icon: ShieldCheck },
+      { id: 'dashboard', label: 'Vue d’ensemble & Stats', icon: LayoutDashboard },
+      { id: 'moderation', label: 'Modération des Rapports', icon: ShieldCheck },
+      { id: 'ai-matcher', label: 'IA Analyse CV (Gemini)', icon: Sparkles },
     ]
   };
 
