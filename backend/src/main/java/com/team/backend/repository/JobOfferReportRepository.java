@@ -1,12 +1,11 @@
 package com.team.backend.repository;
 
-import java.util.List;
-
+import com.team.backend.entity.JobOfferReport;
+import com.team.backend.entity.enums.ReportStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.team.backend.entity.JobOfferReport;
-import com.team.backend.entity.enums.ReportStatus;
+import java.util.List;
 
 @Repository
 public interface JobOfferReportRepository extends JpaRepository<JobOfferReport, Long> {
@@ -16,4 +15,6 @@ public interface JobOfferReportRepository extends JpaRepository<JobOfferReport, 
     List<JobOfferReport> findByStatusOrderByReportDateDesc(ReportStatus status);
 
     long countByStatus(ReportStatus status);
+
+    boolean existsByJobOfferId(Long jobOfferId);
 }

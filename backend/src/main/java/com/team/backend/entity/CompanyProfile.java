@@ -38,14 +38,15 @@ public class CompanyProfile {
     public CompanyProfile() {
     }
 
-    public CompanyProfile(Long userId, String companyName, String description, String address, String website, String logoUrl) {
-        this.userId = userId;
-        this.companyName = companyName;
-        this.description = description;
-        this.address = address;
-        this.website = website;
-        this.logoUrl = logoUrl;
-    }
+   public CompanyProfile(Long userId, String companyName, String description,
+                      String address, String website, String logoUrl) {
+    this.userId = userId;
+    this.companyName = companyName;
+    this.description = description;
+    this.address = address;
+    this.website = website;
+    this.logoUrl = logoUrl;
+}
 
     @PrePersist
     protected void onCreate() {

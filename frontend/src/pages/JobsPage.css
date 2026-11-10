@@ -74,6 +74,28 @@
   cursor: pointer;
 }
 
+.jobs-pagination,
+.dashboard-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.jobs-page-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #fecdca;
+  border-radius: var(--radius-md);
+  background: #fef3f2;
+  color: #b42318;
+}
+
 @media (max-width: 860px) {
   .jobs-layout-grid {
     grid-template-columns: 1fr;

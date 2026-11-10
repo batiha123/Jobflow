@@ -10,4 +10,6 @@ import java.util.List;
 public interface TestRepository extends JpaRepository<Test, Long> {
 
     List<Test> findByJobOfferId(Long jobOfferId);
+
+    boolean existsByJobOfferId(Long jobOfferId);
 }

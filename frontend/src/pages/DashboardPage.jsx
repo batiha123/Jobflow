@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar/Navbar';
 import { DashboardLayout } from '../components/Dashboard/DashboardLayout';
@@ -8,19 +8,26 @@ import { JobOfferForm } from '../components/JobOfferModal/JobOfferForm';
 import { ApplicationsView } from '../components/Applications/ApplicationsView';
 import { AuthModal } from '../components/AuthModal/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast/Toast';
 import { db } from '../data/dbStore';
-import api from '../services/api';
+import api, {
+  approveJobOffer,
+  closeMyJobOffer,
+  deleteMyJobOffer,
+  getMyJobOffers,
+  getPendingJobOffers,
+  rejectJobOffer,
+  submitMyJobOffer
+} from '../services/api';
 import { 
   Briefcase, 
-  Users, 
   FileCheck2, 
-  Building2, 
   Plus, 
   Trash2, 
   Edit3, 
   LogIn,
-  AlertTriangle,
   ArrowRight,
+  AlertTriangle,
   ShieldCheck,
   Sparkles,
   CheckCircle,
@@ -32,6 +39,7 @@ import {
 
 export function DashboardPage() {
   const { currentUser } = useAuth();
+  const toast = useToast();
   const currentRole = currentUser?.role || 'CANDIDATE';
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -43,7 +51,7 @@ export function DashboardPage() {
   const [myOffers, setMyOffers] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
   const [candidateProfile, setCandidateProfile] = useState(null);
-  
+
   // Person 4: Admin Live Backend Data
   const [adminStats, setAdminStats] = useState({
     totalUsers: 0,
@@ -61,21 +69,72 @@ export function DashboardPage() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  const refreshData = async () => {
+  // Person 2: Company Offer States & Filters
+  const [offerFilters, setOfferFilters] = useState({
+    title: '',
+    location: '',
+    contractType: '',
+    status: ''
+  });
+  const [offerPage, setOfferPage] = useState(0);
+  const [offerPageCount, setOfferPageCount] = useState(0);
+  const [totalMyOffers, setTotalMyOffers] = useState(0);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [offersError, setOffersError] = useState('');
+  const [pendingOffers, setPendingOffers] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState('');
+  const [actingOfferId, setActingOfferId] = useState(null);
+
+  const loadCompanyOffers = useCallback(async () => {
+    setOffersLoading(true);
+    setOffersError('');
+    try {
+      const result = await getMyJobOffers({
+        ...offerFilters,
+        contractType: offerFilters.contractType || undefined,
+        status: offerFilters.status || undefined,
+        page: offerPage,
+        size: 10
+      });
+      setMyOffers(Array.isArray(result) ? result : result?.content || []);
+      setOfferPageCount(Array.isArray(result) ? 1 : result?.totalPages || 0);
+      setTotalMyOffers(Array.isArray(result) ? result.length : result?.totalElements || 0);
+    } catch (requestError) {
+      setOffersError(requestError.message || 'Impossible de charger vos offres.');
+      setMyOffers([]);
+    } finally {
+      setOffersLoading(false);
+    }
+  }, [offerFilters, offerPage]);
+
+  const loadPendingOffers = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError('');
+    try {
+      const result = await getPendingJobOffers({ page: 0, size: 100 });
+      setPendingOffers(Array.isArray(result) ? result : result?.content || []);
+    } catch (requestError) {
+      setPendingError(requestError.message || 'Impossible de charger les offres en attente.');
+      setPendingOffers([]);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
+  const refreshData = useCallback(async () => {
     if (!currentUser) return;
-    
+
     if (currentRole === 'COMPANY') {
-      const offers = db.getJobOffersForCompany(currentUser);
       const apps = db.getApplicationsForCompany(currentUser);
-      setMyOffers(offers);
       setMyApplications(apps);
+      await loadCompanyOffers();
     } else if (currentRole === 'CANDIDATE') {
       const apps = db.getApplicationsForCandidate(currentUser);
       const prof = db.getCandidateProfileByUser(currentUser);
       setMyApplications(apps);
       setCandidateProfile(prof);
     } else if (currentRole === 'ADMIN') {
-      // Fetch live statistics from Spring Boot Backend
       try {
         const stats = await api.admin.getStats();
         setAdminStats(stats);
@@ -86,12 +145,13 @@ export function DashboardPage() {
       } catch (err) {
         console.error('Failed to load admin data:', err);
       }
+      await loadPendingOffers();
     }
-  };
+  }, [currentUser, currentRole, loadCompanyOffers, loadPendingOffers]);
 
   useEffect(() => {
     refreshData();
-  }, [currentUser, currentRole]);
+  }, [refreshData]);
 
   // Moderation: Update report status
   const handleUpdateReportStatus = async (reportId, newStatus) => {
@@ -138,10 +198,24 @@ export function DashboardPage() {
     return Math.min(score, 100);
   };
 
-  const handleDeleteOffer = (id) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette offre d'emploi ?")) {
-      db.deleteJobOffer(id);
-      refreshData();
+  const handleOfferAction = async (action, offer) => {
+    if (action === 'delete' && !window.confirm('Confirmer la suppression de cette offre ?')) {
+      return;
+    }
+
+    setActingOfferId(offer.id);
+    try {
+      if (action === 'delete') await deleteMyJobOffer(offer.id);
+      if (action === 'submit') await submitMyJobOffer(offer.id);
+      if (action === 'close') await closeMyJobOffer(offer.id);
+      if (action === 'approve') await approveJobOffer(offer.id);
+      if (action === 'reject') await rejectJobOffer(offer.id);
+      toast.success(action === 'delete' ? 'Offre supprimée.' : 'Statut de l’offre mis à jour.');
+      await refreshData();
+    } catch (requestError) {
+      toast.error(requestError.message || 'Impossible de traiter cette offre.');
+    } finally {
+      setActingOfferId(null);
     }
   };
 
@@ -195,6 +269,52 @@ export function DashboardPage() {
   const candidateInterviewsCount = myApplications.filter(a => a.interview && a.interview.scheduled_at).length;
   const companyInterviewsCount = myApplications.filter(a => a.interview && a.interview.scheduled_at).length;
   const candidateCompleteness = computeProfileCompleteness(candidateProfile);
+  const canDeleteOffer = offer => ['DRAFT', 'REJECTED', 'CLOSED'].includes(offer.status);
+
+  const renderCompanyOffer = offer => (
+    <div key={offer.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '16px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+      <div>
+        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{offer.title}</div>
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
+          {offer.location || 'Localisation non précisée'} · {offer.contractType} · Statut : <strong>{offer.status}</strong>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {offer.status === 'DRAFT' && (
+          <>
+            <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => {
+              setEditingOffer(offer);
+              setIsOfferModalOpen(true);
+            }}>
+              <Edit3 size={14} />
+              <span>Modifier</span>
+            </button>
+            <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('submit', offer)}>
+              <FileCheck2 size={14} />
+              <span>Soumettre</span>
+            </button>
+          </>
+        )}
+        {offer.status === 'PUBLISHED' && (
+          <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('close', offer)}>
+            <span>Clôturer</span>
+          </button>
+        )}
+        {canDeleteOffer(offer) && (
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={actingOfferId === offer.id}
+            style={{ color: 'var(--color-danger)' }}
+            onClick={() => handleOfferAction('delete', offer)}
+          >
+            <Trash2 size={14} />
+            <span>{actingOfferId === offer.id ? 'En cours…' : 'Supprimer'}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   const filteredReports = filterReportStatus 
     ? reports.filter(r => r.status === filterReportStatus)
@@ -250,7 +370,7 @@ export function DashboardPage() {
                 <>
                   <div className="metric-card">
                     <span className="metric-card-title">Offres Publiées</span>
-                    <span className="metric-card-val">{myOffers.length}</span>
+                    <span className="metric-card-val">{totalMyOffers}</span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-card-title">Candidatures reçues</span>
@@ -366,9 +486,9 @@ export function DashboardPage() {
               <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)', marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                    Vos offres d'emploi en ligne
+                    Vos offres d'emploi
                   </h3>
-                  {myOffers.length > 0 && (
+                  {totalMyOffers > 0 && (
                     <button
                       type="button"
                       className="btn-secondary"
@@ -379,58 +499,37 @@ export function DashboardPage() {
                     </button>
                   )}
                 </div>
-
-                {myOffers.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Vous n'avez pas encore publié d'offre. Cliquez sur "Publier une offre" pour créer votre première annonce.
-                  </p>
+                
+                {offersError && (
+                  <div role="alert" className="dashboard-error-message">
+                    <span>{offersError}</span>
+                    <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
+                  </div>
+                )}
+                {offersLoading ? (
+                  <p role="status">Chargement de vos offres…</p>
+                ) : myOffers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '36px 20px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px dashed var(--border-default)' }}>
+                    <Briefcase size={36} style={{ color: 'var(--color-primary)', opacity: 0.5, marginBottom: '8px' }} />
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Vous n'avez pas encore publié d'offre</h4>
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.88rem', marginTop: '4px', marginBottom: '16px' }}>
+                      Créez une offre en brouillon, puis soumettez-la pour validation.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-register-pill"
+                      onClick={() => {
+                        setEditingOffer(null);
+                        setIsOfferModalOpen(true);
+                      }}
+                    >
+                      <Plus size={16} />
+                      <span>Publier ma première offre</span>
+                    </button>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {myOffers.slice(0, 3).map((offer) => (
-                      <div
-                        key={offer.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '16px',
-                          borderRadius: '12px',
-                          border: '1px solid var(--border-subtle)',
-                          background: 'var(--bg-page)'
-                        }}
-                      >
-                        <div>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{offer.title}</strong>
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            {offer.location} · {offer.contract_type} · Publiée le {new Date(offer.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                            onClick={() => {
-                              setEditingOffer(offer);
-                              setIsOfferModalOpen(true);
-                            }}
-                          >
-                            <Edit3 size={14} />
-                            <span>Modifier</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '6px 14px', fontSize: '0.82rem', color: 'var(--color-danger)' }}
-                            onClick={() => handleDeleteOffer(offer.id)}
-                          >
-                            <Trash2 size={14} />
-                            <span>Supprimer</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {myOffers.slice(0, 5).map(renderCompanyOffer)}
                   </div>
                 )}
               </div>
@@ -476,7 +575,7 @@ export function DashboardPage() {
             <div className="dashboard-page-header">
               <div>
                 <h1>Gestion de vos Annonces d'Emploi</h1>
-                <p>Vos offres sont visibles en temps réel par tous les candidats sur le catalogue public.</p>
+                <p>Gérez vos brouillons, soumettez-les pour validation et suivez leur statut.</p>
               </div>
               <button
                 type="button"
@@ -491,80 +590,90 @@ export function DashboardPage() {
               </button>
             </div>
 
-            {myOffers.length === 0 ? (
-              <div style={{ background: 'var(--bg-surface)', padding: '40px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-default)' }}>
-                <h3>Aucune offre publiée</h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                  Commencez dès maintenant à recruter les meilleurs talents en publiant votre première offre.
-                </p>
-                <button
-                  type="button"
-                  className="btn-register-pill"
-                  onClick={() => {
-                    setEditingOffer(null);
-                    setIsOfferModalOpen(true);
-                  }}
-                >
-                  <Plus size={16} />
-                  <span>Publier une annonce</span>
-                </button>
+            <div className="dashboard-offer-filters">
+              <input
+                className="form-input"
+                aria-label="Filtrer par titre"
+                placeholder="Titre"
+                value={offerFilters.title}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, title: event.target.value }));
+                  setOfferPage(0);
+                }}
+              />
+              <input
+                className="form-input"
+                aria-label="Filtrer par localisation"
+                placeholder="Localisation"
+                value={offerFilters.location}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, location: event.target.value }));
+                  setOfferPage(0);
+                }}
+              />
+              <select
+                className="form-input"
+                aria-label="Filtrer par type de contrat"
+                value={offerFilters.contractType}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, contractType: event.target.value }));
+                  setOfferPage(0);
+                }}
+              >
+                <option value="">Tous les contrats</option>
+                <option value="FULL_TIME">CDI / Temps plein</option>
+                <option value="PART_TIME">Temps partiel</option>
+                <option value="INTERNSHIP">Stage</option>
+                <option value="CONTRACT">Freelance / Contrat</option>
+                <option value="TEMPORARY">CDD / Intérim</option>
+              </select>
+              <select
+                className="form-input"
+                aria-label="Filtrer par statut"
+                value={offerFilters.status}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, status: event.target.value }));
+                  setOfferPage(0);
+                }}
+              >
+                <option value="">Tous les statuts</option>
+                <option value="DRAFT">Brouillon</option>
+                <option value="PENDING">En attente</option>
+                <option value="PUBLISHED">Publiée</option>
+                <option value="REJECTED">Refusée</option>
+                <option value="CLOSED">Clôturée</option>
+              </select>
+            </div>
+
+            {offersError && (
+              <div role="alert" className="dashboard-error-message">
+                <span>{offersError}</span>
+                <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
+              </div>
+            )}
+            {offersLoading ? (
+              <p role="status">Chargement de vos offres…</p>
+            ) : myOffers.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <Briefcase size={40} />
+                <h3>Aucune offre ne correspond à ces filtres.</h3>
+                <p>Créez une offre en brouillon ou ajustez votre recherche.</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {myOffers.map((offer) => (
-                  <div
-                    key={offer.id}
-                    style={{
-                      background: 'var(--bg-surface)',
-                      padding: '24px',
-                      borderRadius: '16px',
-                      border: '1px solid var(--border-default)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>{offer.title}</h3>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
-                          ACTIVE
-                        </span>
-                      </div>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '6px 0 12px 0', maxWidth: '650px' }}>
-                        {offer.description.substring(0, 160)}...
-                      </p>
-                      <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
-                        <span>📍 {offer.location}</span>
-                        <span>📄 {offer.contract_type}</span>
-                        <span>💶 {offer.salary ? `${offer.salary} €` : 'Salaire non spécifié'}</span>
-                      </div>
-                    </div>
+                {myOffers.map(renderCompanyOffer)}
+              </div>
+            )}
 
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={() => {
-                          setEditingOffer(offer);
-                          setIsOfferModalOpen(true);
-                        }}
-                      >
-                        <Edit3 size={15} />
-                        <span>Modifier</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ color: 'var(--color-danger)' }}
-                        onClick={() => handleDeleteOffer(offer.id)}
-                      >
-                        <Trash2 size={15} />
-                        <span>Supprimer</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {offerPageCount > 1 && (
+              <div className="dashboard-pagination">
+                <button type="button" className="btn-secondary" disabled={offerPage === 0} onClick={() => setOfferPage(page => page - 1)}>
+                  Page précédente
+                </button>
+                <span>Page {offerPage + 1} sur {offerPageCount} · {totalMyOffers} offre(s)</span>
+                <button type="button" className="btn-secondary" disabled={offerPage + 1 >= offerPageCount} onClick={() => setOfferPage(page => page + 1)}>
+                  Page suivante
+                </button>
               </div>
             )}
           </div>
@@ -583,127 +692,176 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 5: MODERATION (Person 4 — Real Backend Reports) */}
+        {/* TAB 5: MODERATION (Person 2 Pending Offers + Person 4 Reports Moderation) */}
         {activeTab === 'moderation' && (
           <div>
             <div className="dashboard-page-header">
               <div>
-                <h1>Modération & Gestion des Signalements</h1>
-                <p>Examinez les signalements déposés par les utilisateurs en temps réel via l'API Spring Boot.</p>
-              </div>
-
-              {/* Status Filter buttons */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className={`btn-secondary ${filterReportStatus === '' ? 'active' : ''}`}
-                  onClick={() => setFilterReportStatus('')}
-                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                >
-                  Tous ({reports.length})
-                </button>
-                <button
-                  type="button"
-                  className={`btn-secondary ${filterReportStatus === 'PENDING' ? 'active' : ''}`}
-                  onClick={() => setFilterReportStatus('PENDING')}
-                  style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#b45309' }}
-                >
-                  En attente ({reports.filter(r => r.status === 'PENDING').length})
-                </button>
-                <button
-                  type="button"
-                  className={`btn-secondary ${filterReportStatus === 'REVIEWED' ? 'active' : ''}`}
-                  onClick={() => setFilterReportStatus('REVIEWED')}
-                  style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#15803d' }}
-                >
-                  Examinés ({reports.filter(r => r.status === 'REVIEWED').length})
-                </button>
+                <h1>Modération & Supervision de la Plateforme</h1>
+                <p>Approuvez les offres soumises et examinez les signalements déposés par les utilisateurs.</p>
               </div>
             </div>
 
-            {filteredReports.length === 0 ? (
-              <div style={{ background: 'var(--bg-surface)', padding: '40px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-default)' }}>
-                <ShieldCheck size={36} style={{ color: '#16a34a', margin: '0 auto 12px auto' }} />
-                <h3>Aucun signalement trouvé</h3>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  La plateforme est saine. Aucun rapport ne correspond au filtre sélectionné.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {filteredReports.map((report) => (
-                  <div
-                    key={report.id}
-                    style={{
-                      background: 'var(--bg-surface)',
-                      padding: '20px',
-                      borderRadius: '16px',
-                      border: '1px solid var(--border-default)',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'space-between',
-                      gap: '16px'
-                    }}
+            {/* SECTION 1: OFFRES D'EMPLOI EN ATTENTE (Person 2) */}
+            <div style={{ marginBottom: '36px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '14px' }}>
+                Offres d'emploi en attente de validation ({pendingOffers.length})
+              </h2>
+
+              {pendingError && (
+                <div role="alert" className="dashboard-error-message" style={{ marginBottom: '14px' }}>
+                  <span>{pendingError}</span>
+                  <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
+                </div>
+              )}
+              {pendingLoading ? (
+                <p role="status">Chargement des offres en attente…</p>
+              ) : pendingOffers.length === 0 ? (
+                <div className="dashboard-empty-state" style={{ marginBottom: '24px' }}>
+                  <h3>Aucune offre en attente d'approbation.</h3>
+                  <p>Toutes les annonces soumises ont été traitées.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+                  {pendingOffers.map(offer => (
+                    <div key={offer.id} className="dashboard-pending-offer">
+                      <div>
+                        <h3>{offer.title}</h3>
+                        <p>{offer.companyName} · {offer.location || 'Localisation non précisée'} · {offer.contractType}</p>
+                        <p>{offer.description}</p>
+                      </div>
+                      <div className="dashboard-pending-actions">
+                        <button type="button" className="btn-primary-save" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('approve', offer)}>
+                          Approuver
+                        </button>
+                        <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('reject', offer)}>
+                          Refuser
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 2: SIGNALEMENTS DES UTILISATEURS (Person 4) */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
+                  Signalements utilisateurs
+                </h2>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className={`btn-secondary ${filterReportStatus === '' ? 'active' : ''}`}
+                    onClick={() => setFilterReportStatus('')}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
                   >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background: report.status === 'PENDING' ? '#fef3c7' : (report.status === 'REVIEWED' ? '#dcfce7' : '#f1f5f9'),
-                          color: report.status === 'PENDING' ? '#b45309' : (report.status === 'REVIEWED' ? '#15803d' : '#64748b')
-                        }}>
-                          {report.status}
+                    Tous ({reports.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-secondary ${filterReportStatus === 'PENDING' ? 'active' : ''}`}
+                    onClick={() => setFilterReportStatus('PENDING')}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#b45309' }}
+                  >
+                    En attente ({reports.filter(r => r.status === 'PENDING').length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-secondary ${filterReportStatus === 'REVIEWED' ? 'active' : ''}`}
+                    onClick={() => setFilterReportStatus('REVIEWED')}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px', color: '#15803d' }}
+                  >
+                    Examinés ({reports.filter(r => r.status === 'REVIEWED').length})
+                  </button>
+                </div>
+              </div>
+
+              {filteredReports.length === 0 ? (
+                <div style={{ background: 'var(--bg-surface)', padding: '40px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-default)' }}>
+                  <ShieldCheck size={36} style={{ color: '#16a34a', margin: '0 auto 12px auto' }} />
+                  <h3>Aucun signalement trouvé</h3>
+                  <p style={{ color: 'var(--text-secondary)' }}>
+                    La plateforme est saine. Aucun rapport ne correspond au filtre sélectionné.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {filteredReports.map((report) => (
+                    <div
+                      key={report.id}
+                      style={{
+                        background: 'var(--bg-surface)',
+                        padding: '20px',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-default)',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: '16px'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: report.status === 'PENDING' ? '#fef3c7' : (report.status === 'REVIEWED' ? '#dcfce7' : '#f1f5f9'),
+                            color: report.status === 'PENDING' ? '#b45309' : (report.status === 'REVIEWED' ? '#15803d' : '#64748b')
+                          }}>
+                            {report.status}
+                          </span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                            Signalement #{report.id} sur l'Offre #{report.jobOfferId}
+                          </strong>
+                        </div>
+
+                        <p style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 600, color: '#334155' }}>
+                          Motif : {report.reason}
+                        </p>
+                        {report.description && (
+                          <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#64748b' }}>
+                            Détails : {report.description}
+                          </p>
+                        )}
+
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          Signalé par utilisateur #{report.userId} · Date : {report.reportDate ? new Date(report.reportDate).toLocaleString('fr-FR') : 'N/A'}
                         </span>
-                        <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-                          Signalement #{report.id} sur l'Offre #{report.jobOfferId}
-                        </strong>
                       </div>
 
-                      <p style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 600, color: '#334155' }}>
-                        Motif : {report.reason}
-                      </p>
-                      {report.description && (
-                        <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#64748b' }}>
-                          Détails : {report.description}
-                        </p>
-                      )}
-
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        Signalé par utilisateur #{report.userId} · Date : {report.reportDate ? new Date(report.reportDate).toLocaleString('fr-FR') : 'N/A'}
-                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        {report.status !== 'REVIEWED' && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#16a34a' }}
+                            onClick={() => handleUpdateReportStatus(report.id, 'REVIEWED')}
+                          >
+                            <CheckCircle size={14} />
+                            <span>Valider / Traiter</span>
+                          </button>
+                        )}
+                        {report.status !== 'DISMISSED' && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#64748b' }}
+                            onClick={() => handleUpdateReportStatus(report.id, 'DISMISSED')}
+                          >
+                            <XCircle size={14} />
+                            <span>Ignorer</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      {report.status !== 'REVIEWED' && (
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#16a34a' }}
-                          onClick={() => handleUpdateReportStatus(report.id, 'REVIEWED')}
-                        >
-                          <CheckCircle size={14} />
-                          <span>Valider / Traiter</span>
-                        </button>
-                      )}
-                      {report.status !== 'DISMISSED' && (
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#64748b' }}
-                          onClick={() => handleUpdateReportStatus(report.id, 'DISMISSED')}
-                        >
-                          <XCircle size={14} />
-                          <span>Ignorer</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, MapPin, Banknote, Clock, ArrowRight, Building2, CheckCircle2 } from 'lucide-react';
+import { X, MapPin, Banknote, Clock, ArrowRight, AlertCircle } from 'lucide-react';
+import { resolveApiAssetUrl } from '../../services/api';
 import './JobDetailModal.css';
 
 const contractLabels = {
@@ -10,8 +11,14 @@ const contractLabels = {
   TEMPORARY: 'Intérim'
 };
 
-export function JobDetailModal({ offer, onClose, onApply }) {
+export function JobDetailModal({ offer, onClose, onApply, loading = false, error = '' }) {
   if (!offer) return null;
+  const companyName = offer.companyName || offer.company_name || '';
+  const companyLogo = offer.companyLogoUrl || offer.company_logo;
+  const contractType = offer.contractType || offer.contract_type;
+  const salaryMin = offer.salaryMin ?? offer.salary_min;
+  const salaryMax = offer.salaryMax ?? offer.salary_max;
+  const publicationDate = offer.publicationDate || offer.publication_date;
 
   const formatSalary = (min, max) => {
     if (!min && !max) return 'Rémunération selon profil';
@@ -35,24 +42,32 @@ export function JobDetailModal({ offer, onClose, onApply }) {
 
         {/* Header */}
         <div className="job-detail-header">
-          {offer.company_logo ? (
-            <img src={offer.company_logo} alt={offer.company_name} className="job-detail-logo" />
+          {companyLogo ? (
+            <img src={resolveApiAssetUrl(companyLogo)} alt={companyName} className="job-detail-logo" />
           ) : (
             <div className="job-company-logo-placeholder" style={{ width: '68px', height: '68px', fontSize: '1.4rem' }}>
-              {offer.company_name?.charAt(0) || 'J'}
+              {companyName.charAt(0) || 'J'}
             </div>
           )}
 
           <div className="job-detail-title-group" style={{ paddingRight: '36px' }}>
             <h2>{offer.title}</h2>
-            <div className="job-detail-company">{offer.company_name}</div>
+            <div className="job-detail-company">{companyName}</div>
           </div>
         </div>
+
+        {loading && <p role="status" style={{ marginTop: '16px' }}>Chargement des détails…</p>}
+        {error && (
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', color: '#b42318' }}>
+            <AlertCircle size={18} />
+            <span>{error} Les informations de la liste restent affichées.</span>
+          </div>
+        )}
 
         {/* Meta badges row */}
         <div className="job-detail-meta-pills">
           <span className="job-pill-contract" style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
-            {contractLabels[offer.contract_type] || offer.contract_type}
+            {contractLabels[contractType] || contractType}
           </span>
           {offer.location && (
             <span className="job-pill-location" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
@@ -60,15 +75,15 @@ export function JobDetailModal({ offer, onClose, onApply }) {
               <span>{offer.location}</span>
             </span>
           )}
-          {(offer.salary_min || offer.salary_max) && (
+          {(salaryMin || salaryMax) && (
             <span className="job-pill-salary" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
               <Banknote size={15} />
-              <span>{formatSalary(offer.salary_min, offer.salary_max)}</span>
+              <span>{formatSalary(salaryMin, salaryMax)}</span>
             </span>
           )}
           <span className="job-posted-time" style={{ fontSize: '0.85rem', marginLeft: 'auto' }}>
             <Clock size={13} style={{ display: 'inline', marginRight: '4px' }} />
-            Publiée le {new Date(offer.publication_date || Date.now()).toLocaleDateString('fr-FR')}
+            Publiée le {new Date(publicationDate || Date.now()).toLocaleDateString('fr-FR')}
           </span>
         </div>
 

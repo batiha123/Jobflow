@@ -1,35 +1,67 @@
 import React, { useState } from 'react';
-import { db } from '../../data/dbStore';
-import { useAuth } from '../../contexts/AuthContext';
-import { X, Check } from 'lucide-react';
+import { AlertCircle, Check, X } from 'lucide-react';
+import { useToast } from '../Toast/Toast';
+import { createJobOffer, updateMyJobOffer } from '../../services/api';
 import './JobOfferForm.css';
 
+const initialFormValues = offer => ({
+  title: offer?.title || '',
+  description: offer?.description || '',
+  contractType: offer?.contractType || offer?.contract_type || 'FULL_TIME',
+  location: offer?.location || '',
+  salaryMin: offer?.salaryMin ?? offer?.salary_min ?? '',
+  salaryMax: offer?.salaryMax ?? offer?.salary_max ?? ''
+});
+
 export function JobOfferForm({ initialData, onClose, onSaved }) {
-  const { currentUser } = useAuth();
-  const [formData, setFormData] = useState({
-    title: initialData?.title || '',
-    description: initialData?.description || '',
-    contract_type: initialData?.contract_type || 'FULL_TIME',
-    location: initialData?.location || '',
-    salary_min: initialData?.salary_min || '',
-    salary_max: initialData?.salary_max || '',
-    status: initialData?.status || 'PUBLISHED'
-  });
+  const toast = useToast();
+  const [formData, setFormData] = useState(() => initialFormValues(initialData));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(previous => ({ ...previous, [field]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (initialData?.id) {
-      const updated = db.updateJobOffer(initialData.id, formData);
-      if (onSaved) onSaved(updated);
-    } else {
-      const created = db.createJobOfferForCompany(currentUser, formData);
-      if (onSaved) onSaved(created);
+  const handleSubmit = async event => {
+    event.preventDefault();
+    setError('');
+
+    if (initialData?.id && initialData.status !== 'DRAFT') {
+      setError('Seules les offres en brouillon peuvent être modifiées.');
+      return;
     }
-    if (onClose) onClose();
+
+    const salaryMin = formData.salaryMin === '' ? null : Number(formData.salaryMin);
+    const salaryMax = formData.salaryMax === '' ? null : Number(formData.salaryMax);
+    if (salaryMin !== null && salaryMax !== null && salaryMin > salaryMax) {
+      setError('Le salaire minimum ne peut pas dépasser le salaire maximum.');
+      return;
+    }
+
+    const request = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      location: formData.location.trim(),
+      contractType: formData.contractType,
+      salaryMin,
+      salaryMax
+    };
+
+    setSaving(true);
+    try {
+      const savedOffer = initialData?.id
+        ? await updateMyJobOffer(initialData.id, request)
+        : await createJobOffer(request);
+      toast.success(initialData?.id ? 'Brouillon mis à jour.' : 'Brouillon créé.');
+      onSaved?.(savedOffer);
+      onClose?.();
+    } catch (requestError) {
+      setError(requestError.message || 'Impossible d’enregistrer cette offre.');
+      toast.error(requestError.message || 'Impossible d’enregistrer cette offre.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -38,43 +70,47 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
         <div className="modal-header-row">
           <div>
             <h3 className="modal-title">
-              {initialData?.id ? "Modifier l'offre d'emploi" : "Créer une nouvelle annonce d'emploi"}
+              {initialData?.id ? 'Modifier le brouillon' : 'Créer une offre d’emploi'}
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-              Publiez votre opportunité directement sur le catalogue de JobFlow.
+              L’offre sera créée en brouillon. Vous pourrez ensuite la soumettre pour validation.
             </p>
           </div>
-          <button type="button" className="btn-close-modal" onClick={onClose}>
+          <button type="button" className="btn-close-modal" onClick={onClose} disabled={saving} aria-label="Fermer">
             <X size={20} />
           </button>
         </div>
 
+        {error && (
+          <div role="alert" className="save-error-banner">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div className="form-grid-2">
-            {/* title */}
             <div className="form-group full-width">
-              <label className="form-label">
-                <span>Titre du poste</span>
-              </label>
-              <input 
+              <label className="form-label" htmlFor="offer-title">Titre du poste</label>
+              <input
+                id="offer-title"
                 type="text"
                 className="form-input"
+                maxLength={255}
                 required
-                placeholder="Ex: Développeur Fullstack React / Spring Boot"
                 value={formData.title}
-                onChange={(e) => handleChange('title', e.target.value)}
+                onChange={event => handleChange('title', event.target.value)}
               />
             </div>
 
-            {/* contract_type */}
             <div className="form-group">
-              <label className="form-label">
-                <span>Type de contrat</span>
-              </label>
+              <label className="form-label" htmlFor="offer-contract">Type de contrat</label>
               <select
+                id="offer-contract"
                 className="form-input"
-                value={formData.contract_type}
-                onChange={(e) => handleChange('contract_type', e.target.value)}
+                required
+                value={formData.contractType}
+                onChange={event => handleChange('contractType', event.target.value)}
               >
                 <option value="FULL_TIME">CDI (Temps plein)</option>
                 <option value="PART_TIME">Temps partiel</option>
@@ -84,88 +120,64 @@ export function JobOfferForm({ initialData, onClose, onSaved }) {
               </select>
             </div>
 
-            {/* location */}
             <div className="form-group">
-              <label className="form-label">
-                <span>Localisation</span>
-              </label>
-              <input 
+              <label className="form-label" htmlFor="offer-location">Localisation</label>
+              <input
+                id="offer-location"
                 type="text"
                 className="form-input"
-                placeholder="Paris (Hybride), Lyon, Télétravail..."
+                maxLength={255}
                 value={formData.location}
-                onChange={(e) => handleChange('location', e.target.value)}
+                onChange={event => handleChange('location', event.target.value)}
               />
             </div>
 
-            {/* salary_min */}
             <div className="form-group">
-              <label className="form-label">
-                <span>Salaire Minimum (€ / an)</span>
-              </label>
-              <input 
+              <label className="form-label" htmlFor="offer-salary-min">Salaire minimum (€ / an)</label>
+              <input
+                id="offer-salary-min"
                 type="number"
                 className="form-input"
-                placeholder="40000"
-                value={formData.salary_min}
-                onChange={(e) => handleChange('salary_min', e.target.value)}
+                min="0"
+                step="0.01"
+                value={formData.salaryMin}
+                onChange={event => handleChange('salaryMin', event.target.value)}
               />
             </div>
 
-            {/* salary_max */}
             <div className="form-group">
-              <label className="form-label">
-                <span>Salaire Maximum (€ / an)</span>
-              </label>
-              <input 
+              <label className="form-label" htmlFor="offer-salary-max">Salaire maximum (€ / an)</label>
+              <input
+                id="offer-salary-max"
                 type="number"
                 className="form-input"
-                placeholder="55000"
-                value={formData.salary_max}
-                onChange={(e) => handleChange('salary_max', e.target.value)}
+                min="0"
+                step="0.01"
+                value={formData.salaryMax}
+                onChange={event => handleChange('salaryMax', event.target.value)}
               />
             </div>
 
-            {/* status */}
             <div className="form-group full-width">
-              <label className="form-label">
-                <span>Statut de visibilité</span>
-              </label>
-              <select
-                className="form-input"
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
-              >
-                <option value="PUBLISHED">Publiée & Active (Visible de tous)</option>
-                <option value="DRAFT">Brouillon (Non visible)</option>
-                <option value="PENDING">En attente de révision</option>
-                <option value="CLOSED">Clôturée / Pourvue</option>
-              </select>
-            </div>
-
-            {/* description */}
-            <div className="form-group full-width">
-              <label className="form-label">
-                <span>Description détaillée du poste & missions</span>
-              </label>
-              <textarea 
+              <label className="form-label" htmlFor="offer-description">Description détaillée du poste</label>
+              <textarea
+                id="offer-description"
                 className="form-textarea"
                 rows={5}
                 required
-                placeholder="Détaillez le rôle, les responsabilités au quotidien, les compétences souhaitées..."
                 value={formData.description}
-                onChange={(e) => handleChange('description', e.target.value)}
+                onChange={event => handleChange('description', event.target.value)}
               />
             </div>
           </div>
 
           <div className="form-actions-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
               Annuler
             </button>
-            <button type="submit" className="btn-primary-save">
+            <button type="submit" className="btn-primary-save" disabled={saving}>
               <Check size={16} />
-              <span>{initialData?.id ? "Mettre à jour l'offre" : "Publier l'offre"}</span>
+              <span>{saving ? 'Enregistrement…' : initialData?.id ? 'Enregistrer le brouillon' : 'Créer le brouillon'}</span>
             </button>
           </div>
         </form>

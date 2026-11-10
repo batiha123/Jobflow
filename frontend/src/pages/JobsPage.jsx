@@ -6,7 +6,8 @@ import { JobDetailModal } from '../components/JobDetailModal/JobDetailModal';
 import { useToast } from '../components/Toast/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
-import { Search, MapPin, Filter, X, CheckCircle2, RotateCcw, FileText, AlertCircle, ArrowRight } from 'lucide-react';
+import { getPublishedJobOfferById, getPublishedJobOffers } from '../services/api';
+import { Search, MapPin, X, CheckCircle2, RotateCcw, FileText, AlertCircle, ArrowRight } from 'lucide-react';
 import './JobsPage.css';
 
 export function JobsPage() {
@@ -19,8 +20,14 @@ export function JobsPage() {
   const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
   const [location, setLocation] = useState(searchParams.get('location') || '');
   const [contractFilter, setContractFilter] = useState('ALL');
-  
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingOffers, setLoadingOffers] = useState(true);
+  const [offersError, setOffersError] = useState('');
+  const [reloadOffersKey, setReloadOffersKey] = useState(0);
   const [selectedOfferForDetail, setSelectedOfferForDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [applyModalOffer, setApplyModalOffer] = useState(null);
   const [motivation, setMotivation] = useState('');
   const [candidateProfile, setCandidateProfile] = useState(null);
@@ -29,24 +36,58 @@ export function JobsPage() {
   const [applyError, setApplyError] = useState(null);
 
   useEffect(() => {
-    // TODO (Team): Connect to backend (e.g. GET /api/jobs) when ready
-    setOffers(db.getJobOffers());
-  }, []);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      setLoadingOffers(true);
+      setOffersError('');
+      try {
+        const result = await getPublishedJobOffers({
+          title: keyword.trim(),
+          location: location.trim(),
+          contractType: contractFilter === 'ALL' ? undefined : contractFilter,
+          page,
+          size: 12
+        }, { signal: controller.signal });
+        setOffers(Array.isArray(result) ? result : result?.content || []);
+        setTotalPages(Array.isArray(result) ? 1 : result?.totalPages || 0);
+      } catch (requestError) {
+        if (requestError.name !== 'AbortError') {
+          setOffersError(requestError.message || 'Impossible de charger les offres publiées.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingOffers(false);
+      }
+    }, 250);
 
-  const filteredOffers = offers.filter((offer) => {
-    const matchKeyword = !keyword || 
-      (offer.title && offer.title.toLowerCase().includes(keyword.toLowerCase())) ||
-      (offer.description && offer.description.toLowerCase().includes(keyword.toLowerCase()));
-    const matchLocation = !location || 
-      (offer.location && offer.location.toLowerCase().includes(location.toLowerCase()));
-    const matchContract = contractFilter === 'ALL' || offer.contract_type === contractFilter || offer.contractType === contractFilter;
-    return matchKeyword && matchLocation && matchContract;
-  });
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [keyword, location, contractFilter, page, reloadOffersKey]);
+
+  const filteredOffers = offers;
 
   const handleResetFilters = () => {
     setKeyword('');
     setLocation('');
     setContractFilter('ALL');
+    setPage(0);
+  };
+
+  const handleViewDetails = async offer => {
+    setSelectedOfferForDetail(offer);
+    setDetailLoading(true);
+    setDetailError('');
+    try {
+      setSelectedOfferForDetail(await getPublishedJobOfferById(offer.id));
+    } catch (requestError) {
+      if (requestError.name !== 'AbortError') {
+        setDetailError(requestError.message || 'Impossible de charger le détail de cette offre.');
+        toast.error(requestError.message || 'Impossible de charger le détail de cette offre.');
+      }
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handleOpenApply = (offer) => {
@@ -121,7 +162,10 @@ export function JobsPage() {
                 placeholder="Poste, mots-clés, technologie..."
                 className="jobs-search-input"
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setPage(0);
+                }}
               />
             </div>
 
@@ -132,14 +176,20 @@ export function JobsPage() {
                 placeholder="Ville ou région..."
                 className="jobs-search-input"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setPage(0);
+                }}
               />
             </div>
 
             <select 
               className="jobs-filter-select"
               value={contractFilter}
-              onChange={(e) => setContractFilter(e.target.value)}
+              onChange={(e) => {
+                setContractFilter(e.target.value);
+                setPage(0);
+              }}
             >
               <option value="ALL">Tous les contrats</option>
               <option value="FULL_TIME">CDI / Temps plein</option>
@@ -182,7 +232,10 @@ export function JobsPage() {
                     type="radio" 
                     name="contractFilter" 
                     checked={contractFilter === opt.val}
-                    onChange={() => setContractFilter(opt.val)}
+                    onChange={() => {
+                      setContractFilter(opt.val);
+                      setPage(0);
+                    }}
                   />
                   <span>{opt.label}</span>
                 </label>
@@ -202,11 +255,21 @@ export function JobsPage() {
         <main>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {filteredOffers.length} offre(s) trouvée(s)
+              {loadingOffers ? 'Chargement des offres…' : `${filteredOffers.length} offre(s) sur cette page`}
             </span>
           </div>
 
-          {filteredOffers.length === 0 ? (
+          {offersError ? (
+            <div role="alert" className="jobs-page-error">
+              <AlertCircle size={18} />
+              <span>{offersError}</span>
+              <button type="button" className="btn-secondary" onClick={() => setReloadOffersKey(key => key + 1)}>
+                Réessayer
+              </button>
+            </div>
+          ) : loadingOffers ? (
+            <p role="status">Recherche des offres publiées…</p>
+          ) : filteredOffers.length === 0 ? (
             <div style={{ background: 'var(--bg-surface)', padding: '48px', textAlign: 'center', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
               <h3>Aucune offre ne correspond à vos critères.</h3>
               <p style={{ color: 'var(--text-tertiary)', marginTop: '8px' }}>
@@ -228,9 +291,21 @@ export function JobsPage() {
                   key={offer.id} 
                   offer={offer} 
                   onApply={(off) => handleOpenApply(off)}
-                  onViewDetails={(off) => setSelectedOfferForDetail(off)}
+                  onViewDetails={handleViewDetails}
                 />
               ))}
+            </div>
+          )}
+
+          {!loadingOffers && !offersError && totalPages > 1 && (
+            <div className="jobs-pagination">
+              <button type="button" className="btn-secondary" disabled={page === 0} onClick={() => setPage(value => value - 1)}>
+                Page précédente
+              </button>
+              <span>Page {page + 1} sur {totalPages}</span>
+              <button type="button" className="btn-secondary" disabled={page + 1 >= totalPages} onClick={() => setPage(value => value + 1)}>
+                Page suivante
+              </button>
             </div>
           )}
         </main>
@@ -241,6 +316,8 @@ export function JobsPage() {
         <JobDetailModal
           offer={selectedOfferForDetail}
           onClose={() => setSelectedOfferForDetail(null)}
+          loading={detailLoading}
+          error={detailError}
           onApply={(off) => {
             setSelectedOfferForDetail(null);
             handleOpenApply(off);
