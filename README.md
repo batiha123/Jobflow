@@ -1,126 +1,115 @@
-# JobFlow — Recruitment Platform
+# JobFlow — Plateforme Intelligente de Recrutement & IA
 
-JobFlow is a web-based recruitment platform designed to connect candidates with companies. It aims to simplify the recruitment process by allowing candidates to discover job opportunities and companies to publish and manage job offers.
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.8-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-1.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-## 🚀 Project Overview
+> **JobFlow** est une plateforme moderne de recrutement web qui connecte candidats et entreprises, enrichie par un système de modération d'offres, une gestion complète des entretiens et tests techniques, et un **moteur d'analyse de CV propulsé par l'IA Google Gemini**.
 
-JobFlow is developed as a team project using a modern web technology stack.
+---
 
-### Main Objectives
+## 👥 Architecture & Répartition de l'Équipe (4 Personas)
 
-- Allow candidates to create and manage their profiles.
-- Enable companies to publish and manage job offers.
-- Allow candidates to apply for available positions.
-- Track application statuses throughout the recruitment process.
-- Support recruitment tests and interview management.
-- Provide notifications and job-offer reporting.
-- Provide administration features for managing users and moderating job offers.
+Le projet intègre de manière unifiée le travail des 4 membres de l'équipe :
 
-## 🛠️ Technologies
+| Persona | Rôle & Responsabilité | Composants Backend | Composants Frontend |
+| :--- | :--- | :--- | :--- |
+| **Persona 1** | **Authentification, Utilisateurs & Profils Candidats** | `AuthController`, `UserController`, `CandidateProfileController`, Spring Security, JWT (HMAC-SHA512) | `AuthModal`, `CandidateProfileForm`, `AuthContext` |
+| **Persona 2** | **Entreprises & Annonces d'Emploi** | `CompanyProfileController`, `JobOfferController`, `LogoStorageService`, Spécifications JPA | `CompaniesPage`, `JobsPage`, `JobOfferForm`, gestion logos |
+| **Persona 3** | **Candidatures, Tests & Recrutement** | `ApplicationController`, `TestController`, `TestAttemptController`, `InterviewController` | `ApplicationsView`, `JobDetailModal`, `TestModal` |
+| **Persona 4** | **Administration, Modération, Notifications & IA Gemini** | `AdminController`, `JobOfferReportController`, `NotificationController`, `AiAnalysisService` | Dashboard modération, stats live, logs d'audit, cloche notifications, IA Gemini CV Matcher |
 
-| Component | Technology |
-|---|---|
-| Frontend | React |
-| Frontend tooling | Vite |
-| Backend | Java, Spring Boot |
-| Database | MySQL |
-| Database management | MySQL Workbench |
-| Version control | Git and GitHub |
+---
 
-## 📁 Project Structure
+## ⚡ Démarrage Rapide
 
-```text
-scroll_master/
-├── frontend/       # React frontend application
-├── backend/        # Spring Boot backend application
-├── database/       # MySQL database scripts
-└── README.md       # Project documentation
-```
+### Prérequis
+* **JDK 21**
+* **Node.js** (v18+) & **npm**
+* **MySQL 8.0**
 
-## ⚙️ Getting Started
+### 1. Base de données
+1. Créez la base de données `scroll_master` dans MySQL.
+2. Exécutez le script d'initialisation et de données de test :
+   ```sql
+   source database/seed_data.sql;
+   ```
 
-### Prerequisites
-
-Install the following tools:
-
-- Git
-- Node.js and npm
-- Java Development Kit (JDK), compatible with the backend configuration
-- MySQL Server
-- MySQL Workbench
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/batiha123/Scroll-master.git
-cd Scroll-master
-```
-
-### 2. Set Up the Database
-
-1. Open MySQL Workbench and connect to your MySQL server.
-2. Open `database/scroll_master.sql`.
-3. Execute the SQL script.
-4. Confirm that the `scroll_master` database and its tables have been created.
-
-**Note:** The database script recreates the tables when executed. Do not rerun it on a database containing data you want to preserve.
-
-### 3. Run the Backend
-
-Open a terminal in the backend directory:
-
-```bash
-cd backend
-```
-
-On Windows, run:
-
+### 2. Démarrer le Backend (Spring Boot)
+Configurez vos identifiants dans `backend/src/main/resources/application.properties` (voir `application.properties.example`), puis lancez :
 ```powershell
+cd backend
 .\mvnw.cmd spring-boot:run
 ```
+* API REST : `http://localhost:8080/api`
+* Documentation Swagger / OpenAPI : **[http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)**
 
-Configure your MySQL connection settings in the backend configuration before starting the application. Keep passwords and other secrets out of Git.
-
-### 4. Run the Frontend
-
-Open another terminal:
-
-```bash
+### 3. Démarrer le Frontend (React + Vite)
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+* Application Web : **[http://localhost:5173](http://localhost:5173)**
 
-Vite will display the local URL where you can open the frontend in your browser.
+---
 
-## 🗄️ Database Overview
+## 🔑 Comptes de Démonstration (Prêts à l'emploi)
 
-The `scroll_master` database contains the following tables:
+Tous les comptes de test partagent le mot de passe universel : **`Password123!`**
 
-- `users` — shared account information and roles.
-- `candidate_profiles` — candidate profile details.
-- `company_profiles` — company information.
-- `job_offers` — job advertisements.
-- `applications` — candidate applications to job offers.
-- `tests` — recruitment tests associated with job offers.
-- `test_attempts` — candidate test attempts and scores.
-- `interviews` — interview scheduling and status.
-- `notifications` — notifications for users.
-- `job_offer_reports` — reports submitted about job offers.
+| Rôle | Email | Mot de passe | Ce que vous pouvez tester |
+| :--- | :--- | :--- | :--- |
+| **👑 Administrateur** | `admin@jobflow.com` | `Password123!` | Métriques de la plateforme en temps réel, modération des annonces soumises et signalements, journal d'audit de sécurité, **Analyseur de CV par Google Gemini**. |
+| **🏢 Entreprise / Recruteur** | `sophie.mercier@novatech.io` | `Password123!` | Création/édition d'annonces, téléversement de logo, consultation des candidatures reçues, programmation d'entretiens vidéo Google Meet. |
+| **👤 Candidat** | `yasmine.benali@gmail.com` | `Password123!` | Recherche d'offres avec filtres, soumission de candidature avec CV et motivation, passage des tests techniques, suivi du statut en direct. |
 
-## 👥 Team Collaboration
+---
 
-This project is developed collaboratively using Git and GitHub.
+## 🌟 Fonctionnalités Clés
 
-- The frontend, backend, and database scripts are version-controlled in the repository.
-- Team members can clone the repository and work on their own local environments.
-- Database schema changes should be shared through updated SQL scripts or database migrations.
-- Never commit passwords, API keys, or other sensitive credentials.
+### 1. Recherche & Filtrage Avancé des Offres
+* Filtrage combiné par titre, mots-clés, localisation et type de contrat (CDI, CDD, Stage, Freelance, Temps partiel).
+* Pagination dynamique gérée côté serveur via Spring Data JPA Specifications.
 
-## 📌 Project Status
+### 2. Workflow de Recrutement Complet
+* **Cycle de vie de l'annonce** : `DRAFT` ➜ `PENDING` ➜ `PUBLISHED` (après validation admin) ➜ `CLOSED`.
+* **Cycle de candidature** : `SUBMITTED` ➜ `UNDER_REVIEW` ➜ `SHORTLISTED` (entretien fixé) ➜ `ACCEPTED` / `REJECTED`.
+* Téléversement et stockage sécurisé des CV (PDF/DOC) et logos d'entreprise.
 
-The project is under development. Features and implementation details may evolve as development progresses.
+### 3. IA Google Gemini 1.5 Flash intégrée
+* Analyse sémantique en direct comparant les compétences d'un candidat aux exigences d'une offre.
+* Calcul d'un score d'adéquation en pourcentage, classification (`STRONG`, `MODERATE`, `WEAK`), compétences validées, compétences manquantes et synthèse rédigée par l'IA.
 
-## 📄 License
+### 4. Sécurité & Audit
+* Authentification JWT stateless (jetons signés HMAC-512 avec expiration).
+* Mots de passe chiffrés par hachage BCrypt.
+* Contrôle d'accès basé sur les rôles (`hasAnyRole('ADMIN', 'COMPANY', 'CANDIDATE')`).
+* Traçabilité intégrale de toutes les actions d'administration dans la table `admin_audit_logs`.
 
-No license has been specified yet.
+---
+
+## 🗄️ Schéma de la Base de Données
+
+La base de données `scroll_master` comprend 12 tables relationnelles synchronisées :
+* `users` — Comptes utilisateurs, rôles et statuts d'activation.
+* `candidate_profiles` — Détails de profil, compétences, formations et expériences.
+* `company_profiles` — Raison sociale, site web, adresse et URL du logo.
+* `admin_profiles` — Profils des gestionnaires de la plateforme.
+* `job_offers` — Annonces d'emploi, salaires, contrats et statuts de modération.
+* `applications` — Dossiers de candidature, messages de motivation et liens CV.
+* `tests` — Évaluations techniques rattachées aux offres.
+* `test_attempts` — Résultats et scores obtenus par les candidats.
+* `interviews` — Entretiens planifiés avec liens visioconférence (Google Meet).
+* `notifications` — Alertes temps réel pour les utilisateurs.
+* `job_offer_reports` — Signalements d'annonces inappropriées soumis par les utilisateurs.
+* `admin_audit_logs` — Journalisation des interventions administrateur.
+
+---
+
+## 📄 Licence
+
+Projet développé dans le cadre d'un projet académique d'intégration Web Fullstack (2026).
