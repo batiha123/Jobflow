@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar/Navbar';
 import { DashboardLayout } from '../components/Dashboard/DashboardLayout';
@@ -8,22 +8,30 @@ import { JobOfferForm } from '../components/JobOfferModal/JobOfferForm';
 import { ApplicationsView } from '../components/Applications/ApplicationsView';
 import { AuthModal } from '../components/AuthModal/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast/Toast';
 import { db } from '../data/dbStore';
+import {
+  approveJobOffer,
+  closeMyJobOffer,
+  deleteMyJobOffer,
+  getMyJobOffers,
+  getPendingJobOffers,
+  rejectJobOffer,
+  submitMyJobOffer
+} from '../services/api';
 import { 
   Briefcase, 
-  Users, 
   FileCheck2, 
-  Building2, 
   Plus, 
   Trash2, 
   Edit3, 
   LogIn,
-  AlertTriangle,
   ArrowRight
 } from 'lucide-react';
 
 export function DashboardPage() {
   const { currentUser } = useAuth();
+  const toast = useToast();
   const currentRole = currentUser?.role || 'CANDIDATE';
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -35,33 +43,79 @@ export function DashboardPage() {
   const [myOffers, setMyOffers] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
   const [candidateProfile, setCandidateProfile] = useState(null);
-  const [globalStats, setGlobalStats] = useState({ users: 0, offers: 0, companies: 0 });
+  const [globalStats] = useState({ users: null, offers: null, companies: null });
+  const [offerFilters, setOfferFilters] = useState({
+    title: '',
+    location: '',
+    contractType: '',
+    status: ''
+  });
+  const [offerPage, setOfferPage] = useState(0);
+  const [offerPageCount, setOfferPageCount] = useState(0);
+  const [totalMyOffers, setTotalMyOffers] = useState(0);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [offersError, setOffersError] = useState('');
+  const [pendingOffers, setPendingOffers] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState('');
+  const [actingOfferId, setActingOfferId] = useState(null);
 
-  const refreshData = () => {
+  const loadCompanyOffers = useCallback(async () => {
+    setOffersLoading(true);
+    setOffersError('');
+    try {
+      const result = await getMyJobOffers({
+        ...offerFilters,
+        contractType: offerFilters.contractType || undefined,
+        status: offerFilters.status || undefined,
+        page: offerPage,
+        size: 10
+      });
+      setMyOffers(Array.isArray(result) ? result : result?.content || []);
+      setOfferPageCount(Array.isArray(result) ? 1 : result?.totalPages || 0);
+      setTotalMyOffers(Array.isArray(result) ? result.length : result?.totalElements || 0);
+    } catch (requestError) {
+      setOffersError(requestError.message || 'Impossible de charger vos offres.');
+      setMyOffers([]);
+    } finally {
+      setOffersLoading(false);
+    }
+  }, [offerFilters, offerPage]);
+
+  const loadPendingOffers = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError('');
+    try {
+      const result = await getPendingJobOffers({ page: 0, size: 100 });
+      setPendingOffers(Array.isArray(result) ? result : result?.content || []);
+    } catch (requestError) {
+      setPendingError(requestError.message || 'Impossible de charger les offres en attente.');
+      setPendingOffers([]);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
+  const refreshData = useCallback(async () => {
     if (!currentUser) return;
-    
+
     if (currentRole === 'COMPANY') {
-      const offers = db.getJobOffersForCompany(currentUser);
       const apps = db.getApplicationsForCompany(currentUser);
-      setMyOffers(offers);
       setMyApplications(apps);
+      await loadCompanyOffers();
     } else if (currentRole === 'CANDIDATE') {
       const apps = db.getApplicationsForCandidate(currentUser);
       const prof = db.getCandidateProfileByUser(currentUser);
       setMyApplications(apps);
       setCandidateProfile(prof);
     } else if (currentRole === 'ADMIN') {
-      setGlobalStats({
-        users: db.getUsers().length,
-        offers: db.getJobOffers().length,
-        companies: db.getCompanyProfiles().length
-      });
+      await loadPendingOffers();
     }
-  };
+  }, [currentUser, currentRole, loadCompanyOffers, loadPendingOffers]);
 
   useEffect(() => {
     refreshData();
-  }, [currentUser, currentRole]);
+  }, [refreshData]);
 
   const computeProfileCompleteness = (prof) => {
     if (!prof) return 30;
@@ -76,10 +130,24 @@ export function DashboardPage() {
     return Math.min(score, 100);
   };
 
-  const handleDeleteOffer = (id) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette offre d'emploi ?")) {
-      db.deleteJobOffer(id);
-      refreshData();
+  const handleOfferAction = async (action, offer) => {
+    if (action === 'delete' && !window.confirm('Confirmer la suppression de cette offre ?')) {
+      return;
+    }
+
+    setActingOfferId(offer.id);
+    try {
+      if (action === 'delete') await deleteMyJobOffer(offer.id);
+      if (action === 'submit') await submitMyJobOffer(offer.id);
+      if (action === 'close') await closeMyJobOffer(offer.id);
+      if (action === 'approve') await approveJobOffer(offer.id);
+      if (action === 'reject') await rejectJobOffer(offer.id);
+      toast.success(action === 'delete' ? 'Offre supprimée.' : 'Statut de l’offre mis à jour.');
+      await refreshData();
+    } catch (requestError) {
+      toast.error(requestError.message || 'Impossible de traiter cette offre.');
+    } finally {
+      setActingOfferId(null);
     }
   };
 
@@ -133,6 +201,52 @@ export function DashboardPage() {
   const candidateInterviewsCount = myApplications.filter(a => a.interview && a.interview.scheduled_at).length;
   const companyInterviewsCount = myApplications.filter(a => a.interview && a.interview.scheduled_at).length;
   const candidateCompleteness = computeProfileCompleteness(candidateProfile);
+  const canDeleteOffer = offer => ['DRAFT', 'REJECTED', 'CLOSED'].includes(offer.status);
+
+  const renderCompanyOffer = offer => (
+    <div key={offer.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '16px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
+      <div>
+        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{offer.title}</div>
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
+          {offer.location || 'Localisation non précisée'} · {offer.contractType} · Statut : <strong>{offer.status}</strong>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {offer.status === 'DRAFT' && (
+          <>
+            <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => {
+              setEditingOffer(offer);
+              setIsOfferModalOpen(true);
+            }}>
+              <Edit3 size={14} />
+              <span>Modifier</span>
+            </button>
+            <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('submit', offer)}>
+              <FileCheck2 size={14} />
+              <span>Soumettre</span>
+            </button>
+          </>
+        )}
+        {offer.status === 'PUBLISHED' && (
+          <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('close', offer)}>
+            <span>Clôturer</span>
+          </button>
+        )}
+        {canDeleteOffer(offer) && (
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={actingOfferId === offer.id}
+            style={{ color: 'var(--color-danger)' }}
+            onClick={() => handleOfferAction('delete', offer)}
+          >
+            <Trash2 size={14} />
+            <span>{actingOfferId === offer.id ? 'En cours…' : 'Supprimer'}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -184,7 +298,7 @@ export function DashboardPage() {
                 <>
                   <div className="metric-card">
                     <span className="metric-card-title">Offres Publiées</span>
-                    <span className="metric-card-val">{myOffers.length}</span>
+                    <span className="metric-card-val">{totalMyOffers}</span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-card-title">Candidatures reçues</span>
@@ -220,15 +334,15 @@ export function DashboardPage() {
                 <>
                   <div className="metric-card">
                     <span className="metric-card-title">Utilisateurs inscrits</span>
-                    <span className="metric-card-val">{globalStats.users}</span>
+                    <span className="metric-card-val">{globalStats.users ?? '—'}</span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-card-title">Total Offres d'emploi</span>
-                    <span className="metric-card-val">{globalStats.offers}</span>
+                    <span className="metric-card-val">{globalStats.offers ?? '—'}</span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-card-title">Total Entreprises</span>
-                    <span className="metric-card-val">{globalStats.companies}</span>
+                    <span className="metric-card-val">{globalStats.companies ?? '—'}</span>
                   </div>
                 </>
               )}
@@ -239,9 +353,9 @@ export function DashboardPage() {
               <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)', marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                    Vos offres d'emploi en ligne
+                    Vos offres d'emploi
                   </h3>
-                  {myOffers.length > 0 && (
+                  {totalMyOffers > 0 && (
                     <button
                       type="button"
                       className="btn-secondary"
@@ -253,12 +367,20 @@ export function DashboardPage() {
                   )}
                 </div>
                 
-                {myOffers.length === 0 ? (
+                {offersError && (
+                  <div role="alert" className="dashboard-error-message">
+                    <span>{offersError}</span>
+                    <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
+                  </div>
+                )}
+                {offersLoading ? (
+                  <p role="status">Chargement de vos offres…</p>
+                ) : myOffers.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '36px 20px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px dashed var(--border-default)' }}>
                     <Briefcase size={36} style={{ color: 'var(--color-primary)', opacity: 0.5, marginBottom: '8px' }} />
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Vous n'avez pas encore publié d'offre</h4>
                     <p style={{ color: 'var(--text-tertiary)', fontSize: '0.88rem', marginTop: '4px', marginBottom: '16px' }}>
-                      Créez votre première annonce pour commencer à attirer des candidats qualifiés.
+                      Créez une offre en brouillon, puis soumettez-la pour validation.
                     </p>
                     <button
                       type="button"
@@ -274,39 +396,7 @@ export function DashboardPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {myOffers.map(offer => (
-                      <div key={offer.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-page)', borderRadius: '12px', border: '1px solid var(--border-default)' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{offer.title}</div>
-                          <div style={{ fontSize: '0.84rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-                            {offer.location} · {offer.contract_type} · Statut : <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{offer.status}</span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                            onClick={() => {
-                              setEditingOffer(offer);
-                              setIsOfferModalOpen(true);
-                            }}
-                          >
-                            <Edit3 size={14} />
-                            <span>Modifier</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '6px 14px', fontSize: '0.82rem', color: 'var(--color-danger)' }}
-                            onClick={() => handleDeleteOffer(offer.id)}
-                          >
-                            <Trash2 size={14} />
-                            <span>Supprimer</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {myOffers.slice(0, 5).map(renderCompanyOffer)}
                   </div>
                 )}
               </div>
@@ -352,7 +442,7 @@ export function DashboardPage() {
             <div className="dashboard-page-header">
               <div>
                 <h1>Gestion de vos Annonces d'Emploi</h1>
-                <p>Vos offres sont visibles en temps réel par tous les candidats sur le catalogue public.</p>
+                <p>Gérez vos brouillons, soumettez-les pour validation et suivez leur statut.</p>
               </div>
               <button
                 type="button"
@@ -367,59 +457,90 @@ export function DashboardPage() {
               </button>
             </div>
 
-            {myOffers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
-                <Briefcase size={44} style={{ color: 'var(--color-primary)', opacity: 0.5, marginBottom: '12px' }} />
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Aucune offre publiée pour le moment</h3>
-                <p style={{ color: 'var(--text-tertiary)', marginTop: '4px', marginBottom: '20px' }}>
-                  Publiez votre première offre d'emploi pour commencer à recevoir des candidatures.
-                </p>
-                <button
-                  type="button"
-                  className="btn-register-pill"
-                  onClick={() => {
-                    setEditingOffer(null);
-                    setIsOfferModalOpen(true);
-                  }}
-                >
-                  <Plus size={16} />
-                  <span>Créer une annonce d'emploi</span>
-                </button>
+            <div className="dashboard-offer-filters">
+              <input
+                className="form-input"
+                aria-label="Filtrer par titre"
+                placeholder="Titre"
+                value={offerFilters.title}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, title: event.target.value }));
+                  setOfferPage(0);
+                }}
+              />
+              <input
+                className="form-input"
+                aria-label="Filtrer par localisation"
+                placeholder="Localisation"
+                value={offerFilters.location}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, location: event.target.value }));
+                  setOfferPage(0);
+                }}
+              />
+              <select
+                className="form-input"
+                aria-label="Filtrer par type de contrat"
+                value={offerFilters.contractType}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, contractType: event.target.value }));
+                  setOfferPage(0);
+                }}
+              >
+                <option value="">Tous les contrats</option>
+                <option value="FULL_TIME">CDI / Temps plein</option>
+                <option value="PART_TIME">Temps partiel</option>
+                <option value="INTERNSHIP">Stage</option>
+                <option value="CONTRACT">Freelance / Contrat</option>
+                <option value="TEMPORARY">CDD / Intérim</option>
+              </select>
+              <select
+                className="form-input"
+                aria-label="Filtrer par statut"
+                value={offerFilters.status}
+                onChange={event => {
+                  setOfferFilters(previous => ({ ...previous, status: event.target.value }));
+                  setOfferPage(0);
+                }}
+              >
+                <option value="">Tous les statuts</option>
+                <option value="DRAFT">Brouillon</option>
+                <option value="PENDING">En attente</option>
+                <option value="PUBLISHED">Publiée</option>
+                <option value="REJECTED">Refusée</option>
+                <option value="CLOSED">Clôturée</option>
+              </select>
+            </div>
+
+            {offersError && (
+              <div role="alert" className="dashboard-error-message">
+                <span>{offersError}</span>
+                <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
+              </div>
+            )}
+            {offersLoading ? (
+              <p role="status">Chargement de vos offres…</p>
+            ) : myOffers.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <Briefcase size={40} />
+                <h3>Aucune offre ne correspond à ces filtres.</h3>
+                <p>Créez une offre en brouillon ou ajustez votre recherche.</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {myOffers.map(offer => (
-                  <div key={offer.id} style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{offer.title}</h3>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                        {offer.location} · {offer.contract_type} · Salaire: {offer.salary_min}€ - {offer.salary_max}€
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={() => {
-                          setEditingOffer(offer);
-                          setIsOfferModalOpen(true);
-                        }}
-                      >
-                        <Edit3 size={14} />
-                        <span>Modifier</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ color: 'var(--color-danger)' }}
-                        onClick={() => handleDeleteOffer(offer.id)}
-                      >
-                        <Trash2 size={14} />
-                        <span>Supprimer</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {myOffers.map(renderCompanyOffer)}
+              </div>
+            )}
+
+            {offerPageCount > 1 && (
+              <div className="dashboard-pagination">
+                <button type="button" className="btn-secondary" disabled={offerPage === 0} onClick={() => setOfferPage(page => page - 1)}>
+                  Page précédente
+                </button>
+                <span>Page {offerPage + 1} sur {offerPageCount} · {totalMyOffers} offre(s)</span>
+                <button type="button" className="btn-secondary" disabled={offerPage + 1 >= offerPageCount} onClick={() => setOfferPage(page => page + 1)}>
+                  Page suivante
+                </button>
               </div>
             )}
           </div>
@@ -444,21 +565,44 @@ export function DashboardPage() {
             <div className="dashboard-page-header">
               <div>
                 <h1>Modération des Annonces</h1>
-                <p>Signalements déposés par les utilisateurs nécessitant un examen.</p>
+                <p>Examinez les offres soumises. L’API vérifie le rôle administrateur pour chaque action.</p>
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-default)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--color-warning-bg)', borderRadius: '10px', border: '1px solid #fedf89' }}>
-                <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
-                <div>
-                  <strong>Signalement sur l'offre #3 (Ingénieur Logiciel Fullstack)</strong>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Motif : Information de salaire à préciser · Statut : En cours d'examen
-                  </div>
-                </div>
+            {pendingError && (
+              <div role="alert" className="dashboard-error-message">
+                <span>{pendingError}</span>
+                <button type="button" className="btn-secondary" onClick={refreshData}>Réessayer</button>
               </div>
-            </div>
+            )}
+            {pendingLoading ? (
+              <p role="status">Chargement des offres en attente…</p>
+            ) : pendingOffers.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <h3>Aucune offre en attente.</h3>
+                <p>Si l’accès est refusé, Personna 1 doit fournir le JWT et l’autorité ROLE_ADMIN.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {pendingOffers.map(offer => (
+                  <div key={offer.id} className="dashboard-pending-offer">
+                    <div>
+                      <h3>{offer.title}</h3>
+                      <p>{offer.companyName} · {offer.location || 'Localisation non précisée'} · {offer.contractType}</p>
+                      <p>{offer.description}</p>
+                    </div>
+                    <div className="dashboard-pending-actions">
+                      <button type="button" className="btn-primary-save" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('approve', offer)}>
+                        Approuver
+                      </button>
+                      <button type="button" className="btn-secondary" disabled={actingOfferId === offer.id} onClick={() => handleOfferAction('reject', offer)}>
+                        Refuser
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </DashboardLayout>

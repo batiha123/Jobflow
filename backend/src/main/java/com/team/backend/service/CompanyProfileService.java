@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @Service
 public class CompanyProfileService {
 
@@ -40,6 +42,13 @@ public class CompanyProfileService {
                         HttpStatus.NOT_FOUND, "Company profile not found"));
 
         return toResponse(companyProfile);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CompanyProfileResponse> getPublicProfiles() {
+        return companyProfileRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional

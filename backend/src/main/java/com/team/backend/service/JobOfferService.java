@@ -173,6 +173,12 @@ public class JobOfferService {
     }
 
     @Transactional(readOnly = true)
+    public Page<JobOfferResponse> getPendingOffers(Pageable pageable) {
+        return jobOfferRepository.findAllByStatus(JobStatus.PENDING, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public Page<JobOfferResponse> searchPublicOffers(
             String title,
             String location,

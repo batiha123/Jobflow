@@ -8,6 +8,12 @@ import { JobDetailModal } from '../components/JobDetailModal/JobDetailModal';
 import { useToast } from '../components/Toast/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../data/dbStore';
+import {
+  getPublicCompanyProfiles,
+  getPublishedJobOfferById,
+  getPublishedJobOffers,
+  resolveApiAssetUrl
+} from '../services/api';
 import { ArrowRight, MapPin, Building2, CheckCircle2, X, FileText, AlertCircle } from 'lucide-react';
 import './HomePage.css';
 
@@ -19,6 +25,13 @@ export function HomePage() {
   const [offers, setOffers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [selectedOfferForDetail, setSelectedOfferForDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [offersLoading, setOffersLoading] = useState(true);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
+  const [offersError, setOffersError] = useState('');
+  const [companiesError, setCompaniesError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   
   // Application Modal state
   const [applyModalOffer, setApplyModalOffer] = useState(null);
@@ -29,10 +42,44 @@ export function HomePage() {
   const [applyError, setApplyError] = useState(null);
 
   useEffect(() => {
-    // TODO (Team): Connect to backend (e.g. GET /api/jobs) when ready
-    setOffers(db.getJobOffers());
-    setCompanies(db.getCompanyProfiles());
-  }, []);
+    const controller = new AbortController();
+
+    getPublishedJobOffers({ page: 0, size: 6 }, { signal: controller.signal })
+      .then(result => setOffers(Array.isArray(result) ? result : result?.content || []))
+      .catch(error => {
+        if (error.name !== 'AbortError') setOffersError(error.message || 'Impossible de charger les offres.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setOffersLoading(false);
+      });
+
+    getPublicCompanyProfiles({ signal: controller.signal })
+      .then(result => setCompanies(Array.isArray(result) ? result.slice(0, 4) : []))
+      .catch(error => {
+        if (error.name !== 'AbortError') setCompaniesError(error.message || 'Impossible de charger les entreprises.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCompaniesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  const handleViewDetails = async offer => {
+    setSelectedOfferForDetail(offer);
+    setDetailLoading(true);
+    setDetailError('');
+    try {
+      setSelectedOfferForDetail(await getPublishedJobOfferById(offer.id));
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        setDetailError(error.message || 'Impossible de charger le détail de cette offre.');
+        toast.error(error.message || 'Impossible de charger le détail de cette offre.');
+      }
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const handleApplyClick = (offer) => {
     if (!currentUser) {
@@ -107,13 +154,26 @@ export function HomePage() {
             </Link>
           </div>
 
+          {offersError && (
+            <div role="alert" className="jobs-page-error">
+              <AlertCircle size={18} />
+              <span>{offersError}</span>
+              <button type="button" className="btn-secondary" onClick={() => {
+                setOffersLoading(true);
+                setOffersError('');
+                setReloadKey(key => key + 1);
+              }}>Réessayer</button>
+            </div>
+          )}
+          {offersLoading ? <p role="status">Chargement des offres…</p> : null}
+          {!offersLoading && !offersError && offers.length === 0 ? <p>Aucune offre publiée pour le moment.</p> : null}
           <div className="jobs-grid-3">
             {offers.slice(0, 6).map((offer) => (
               <JobCard 
                 key={offer.id} 
                 offer={offer} 
                 onApply={handleApplyClick}
-                onViewDetails={(off) => setSelectedOfferForDetail(off)}
+                onViewDetails={handleViewDetails}
               />
             ))}
           </div>
@@ -125,7 +185,7 @@ export function HomePage() {
         <div className="container">
           <div className="section-header-row">
             <div>
-              <h2 className="section-title">Entreprises qui Recrutent</h2>
+              <h2 className="section-title">Entreprises sur JobFlow</h2>
               <p className="section-subtitle">
                 Découvrez la culture d’entreprise et les équipes des leaders tech.
               </p>
@@ -136,24 +196,45 @@ export function HomePage() {
             </Link>
           </div>
 
+          {companiesError && (
+            <div role="alert" className="company-page-error">
+              <AlertCircle size={18} />
+              <span>{companiesError}</span>
+              <button type="button" className="btn-secondary" onClick={() => {
+                setCompaniesLoading(true);
+                setCompaniesError('');
+                setReloadKey(key => key + 1);
+              }}>Réessayer</button>
+            </div>
+          )}
+          {companiesLoading ? <p role="status">Chargement des entreprises…</p> : null}
+          {!companiesLoading && !companiesError && companies.length === 0 ? <p>Aucune entreprise à afficher pour le moment.</p> : null}
           <div className="companies-grid-4">
             {companies.slice(0, 4).map((company) => (
               <div key={company.id} className="company-card">
                 <div className="company-card-top">
-                  <img src={company.logo_url} alt={company.company_name} className="company-card-logo" />
-                  <div>
-                    <h3 className="company-card-title">{company.company_name}</h3>
-                    <div className="company-card-address">
-                      <MapPin size={13} />
-                      <span>{company.address}</span>
+                  {company.logoUrl ? (
+                    <img src={resolveApiAssetUrl(company.logoUrl)} alt={`Logo de ${company.companyName}`} className="company-card-logo" />
+                  ) : (
+                    <div className="company-card-logo company-logo-fallback" aria-hidden="true">
+                      <Building2 size={20} />
                     </div>
+                  )}
+                  <div>
+                    <h3 className="company-card-title">{company.companyName}</h3>
+                    {company.address && (
+                      <div className="company-card-address">
+                        <MapPin size={13} />
+                        <span>{company.address}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <p className="company-card-desc">{company.description}</p>
 
                 <div className="company-card-footer">
-                  <span className="company-badge-open">Recrute activement</span>
+                  <span className="company-badge-open">Entreprise sur JobFlow</span>
                   <Link to="/offres" className="company-link-arrow">
                     <span>Voir les offres</span>
                     <ArrowRight size={14} />
@@ -192,6 +273,8 @@ export function HomePage() {
         <JobDetailModal 
           offer={selectedOfferForDetail} 
           onClose={() => setSelectedOfferForDetail(null)} 
+          loading={detailLoading}
+          error={detailError}
           onApply={(off) => {
             setSelectedOfferForDetail(null);
             handleApplyClick(off);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin, Banknote, ArrowRight, Clock, Eye } from 'lucide-react';
+import { resolveApiAssetUrl } from '../../services/api';
 import './JobCard.css';
 
 const contractLabels = {
@@ -11,6 +12,13 @@ const contractLabels = {
 };
 
 export function JobCard({ offer, onApply, onViewDetails }) {
+  const companyName = offer.companyName || offer.company_name || '';
+  const companyLogo = offer.companyLogoUrl || offer.company_logo;
+  const contractType = offer.contractType || offer.contract_type;
+  const salaryMin = offer.salaryMin ?? offer.salary_min;
+  const salaryMax = offer.salaryMax ?? offer.salary_max;
+  const publicationDate = offer.publicationDate || offer.publication_date;
+
   const formatSalary = (min, max) => {
     if (!min && !max) return 'Salaire selon profil';
     if (min && max) return `${(min / 1000).toFixed(0)}k – ${(max / 1000).toFixed(0)}k €`;
@@ -22,21 +30,21 @@ export function JobCard({ offer, onApply, onViewDetails }) {
     <div className="job-card" onClick={() => onViewDetails && onViewDetails(offer)} style={{ cursor: 'pointer' }}>
       <div>
         <div className="job-card-header">
-          {offer.company_logo ? (
-            <img 
-              src={offer.company_logo} 
-              alt={offer.company_name} 
-              className="job-company-logo" 
+          {companyLogo ? (
+            <img
+              src={resolveApiAssetUrl(companyLogo)}
+              alt={companyName}
+              className="job-company-logo"
             />
           ) : (
             <div className="job-company-logo-placeholder">
-              {offer.company_name?.charAt(0) || 'J'}
+              {companyName.charAt(0) || 'J'}
             </div>
           )}
 
           <div className="job-meta-header">
             <h3 className="job-title">{offer.title}</h3>
-            <span className="job-company-name">{offer.company_name}</span>
+            <span className="job-company-name">{companyName}</span>
           </div>
         </div>
 
@@ -47,7 +55,7 @@ export function JobCard({ offer, onApply, onViewDetails }) {
 
       <div className="job-tags-row">
         <span className="job-pill-contract">
-          {contractLabels[offer.contract_type] || offer.contract_type}
+          {contractLabels[contractType] || contractType}
         </span>
         {offer.location && (
           <span className="job-pill-location">
@@ -55,10 +63,10 @@ export function JobCard({ offer, onApply, onViewDetails }) {
             <span>{offer.location}</span>
           </span>
         )}
-        {(offer.salary_min || offer.salary_max) && (
+        {(salaryMin || salaryMax) && (
           <span className="job-pill-salary">
             <Banknote size={13} />
-            <span>{formatSalary(offer.salary_min, offer.salary_max)}</span>
+            <span>{formatSalary(salaryMin, salaryMax)}</span>
           </span>
         )}
       </div>
@@ -66,7 +74,7 @@ export function JobCard({ offer, onApply, onViewDetails }) {
       <div className="job-card-footer" onClick={(e) => e.stopPropagation()}>
         <span className="job-posted-time">
           <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
-          {offer.publication_date ? new Date(offer.publication_date).toLocaleDateString('fr-FR') : 'Récent'}
+          {publicationDate ? new Date(publicationDate).toLocaleDateString('fr-FR') : 'Récent'}
         </span>
 
         <div style={{ display: 'flex', gap: '8px' }}>
