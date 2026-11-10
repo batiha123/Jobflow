@@ -2,6 +2,7 @@ package com.team.backend.service;
 
 import com.team.backend.dto.AdminStatsDto;
 import com.team.backend.entity.AdminAuditLog;
+import com.team.backend.entity.enums.JobStatus;
 import com.team.backend.entity.enums.ReportStatus;
 import com.team.backend.repository.AdminAuditLogRepository;
 import com.team.backend.repository.JobOfferReportRepository;
@@ -31,7 +32,8 @@ public class AdminService {
         long totalUsers = entityManager.createQuery("SELECT COUNT(u) FROM User u", Long.class)
                 .getSingleResult();
 
-        long activeJobs = entityManager.createQuery("SELECT COUNT(j) FROM JobOffer j WHERE j.status = com.team.backend.entity.enums.JobStatus.ACTIVE", Long.class)
+        long activeJobs = entityManager.createQuery("SELECT COUNT(j) FROM JobOffer j WHERE j.status = :status", Long.class)
+                .setParameter("status", JobStatus.PUBLISHED)
                 .getSingleResult();
 
         long totalApplications = entityManager.createQuery("SELECT COUNT(a) FROM Application a", Long.class)
